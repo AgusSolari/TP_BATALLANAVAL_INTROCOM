@@ -1,0 +1,1122 @@
+*****************************************************************************************************************
+*						TP CALCULADORA				GRUPO 3B		*
+* Consigna: Se pide definir y escribir las subrutinas necesarias para realizar una calculadora de 2 dígitos 	*
+* (como entradas) que realice las operaciones de suma y resta. Como opcional pueden agregar la multiplicación	*
+* y la división entera. Los operandos se ingresarán utilizando el teclado, el resultado de la operación debera	*
+* figurar en el display (3 dígitos como máximo). 								*							
+*														*
+* Se recomienda fuerte mente leer el README que se encuentra en la carpeta del programa. En el mismo se		*
+* especifica los modos de uso, modos de error y aclaraciones.							*
+* En caso contrario se hara un uso indevido de la misma.							*
+*****************************************************************************************************************
+	p68h11				;declaro el tipo del procesador
+******* Ports ***************************
+DDRC	equ	$1007			;data direction register for C
+PIOC	equ	$1002			;for strobe B assertion change
+PORTCL	equ	$1005 			;port C latched
+PORTB	equ	$1004 			;port B
+PORTC	equ	$1003 			;rows
+******* Cols and Row Ports **************
+ROWS	equ	PORTC 			;outputs
+COLS	equ	PORTCL 			;inputs
+***** Row Masks *************************
+FIL0	equ	00001110b		;mascaras para el manejo de filas
+FIL1	equ	00001101b
+FIL2	equ	00001011b
+FIL3	equ	00000111b
+
+COL0	equ	11100000b		;mascaras para el manejo de columnas
+COL1	equ	11010000b
+COL2	equ	10110000b
+COL3	equ	01110000b
+
+****** Keyboard Mask ********************
+SUMA	equ	$A			;se definen las teclas del teclado que realizan una operacion
+RESTA	equ	$B
+MULT	equ	$E
+DIV	equ	$D
+CLEAR	equ	$C
+IGUAL	equ	$0F
+
+STACK	equ	$3500
+ARRAY	equ	$0010
+MASK1	equ	$F0
+MASK2	equ	$0F
+DIRMAK1	equ	$3040
+DIRMAK2	equ	$3030
+TECFIL	equ	$3029			;se definen TECFIL y TECCOL como variables locales las cuales conservaran momentanemante la fila y la columna
+TECCOL	equ	$3028			; de la tecla precionada
+
+RAM	equ	$4000
+FIL	equ	4			;defino una variable con la cantidad de filas de la matriz
+COL	equ	4			;defino una variable con la cantidad de columnas de la matriz
+ASIZE	equ	1			;defino una variable con el tamaño de los elementos de la matriz
+NFIL	equ	$3027
+NCOL	equ	$3026
+VAL1	equ	$3025
+
+****** Variables globales y constantes********
+	ORG	$3019
+NEGATIV	RMB	1
+RES	RMB	2
+dig1	RMB	1
+dig2	RMB	1
+dig3	RMB	1
+dig4	RMB	1
+
+ARRAY2	equ	$4200			;se define la posicion de inicio del ARRAY2 en el cual se guardan los digitos que son precionados del teclado
+ARRAY3	equ	$4400			;se define la posicion de inicio del ARRAY3 en el cual se guardan los numeros que fueron precionados en el teclado (NUM1= Dig1+Dig2)
+
+OPE	equ	$4202			;es un numero que 
+
+NUM1	equ	$4400
+NUM2	equ	$4401
+
+CONTA	equ	$4900
+ARRAY4	EQU	$5000
+
+
+
+
+	org	RAM
+	fcb	0,1,2,3,4,5,6,7,8,9,$A,$B,$C,$D,$E,$F	;se cargan en la matriz los elementos
+
+	org	DIRMAK1
+	fcb	FIL0,FIL1,FIL2,FIL3	;mediante la instruccion FCB cargo de manera consecutiva las diferentes marscaras que se usaran para realizar operaciones con las FILAS
+
+	org	DIRMAK2
+	fcb	COL0,COL1,COL2,COL3	;cargo de manera consecutiva las mascaras de las columnas a partir del putero Y
+
+	MACRO	%DIGTEC
+	jsr	TEC			;esta subrutina se encarga de encontrar la fila de la tecla precionada y almacenaral en una variable local
+	jsr	MATRIZ			;esta subrutina se encarga de obtener el valor del teclado a partir de la fila y columna encontrada
+	jsr	DELAY
+	jsr	VUELTA			;si se dejo de precionar la tecla, me devuelve el carry en 1 y esta tecla sirve, de caso contrario vuleve a TECLADO
+
+	bcc	LOOP			;branch if carry clear (C=0)
+	
+	ENDMAC
+	
+	MACRO	%CLEAN			;defino un macro para limpiar ciertas posiciones de memoria que se necesitan limpias luego de reiniciar la Calculadora
+	ldx	#\0
+	ldab	#\1
+L1	clr	0,x
+	inx
+	decb
+	bne	L1			;branch if not = zero
+	ENDMAC
+
+*****************************************************************************************
+*		MAIN PROGRAM
+* Programa Principal
+*****************************************************************************************
+
+RST	org	$2000
+	%CLEAN	ARRAY2,20		;mediante la macro CLEAR se limpia la posicion de memoria en la cual se guardaran los digitos precionados en el teclado. La fianalidad de esta operacion es evitar errores por residuos
+
+main	equ	*
+	lds	#STK_INI		;se inicializa el STACK
+	
+	jsr	initdis			;se inicializa el display y el teclado
+	jsr	clear			
+
+
+	ldx	#ARRAY2			;se carga en el registro X un puntero en el cual se guardaran los digitos precionados del teclado
+	ldaa	#3			;repeticiones del contador (va en el main, loop o lo que sea)
+	staa	CONTA
+	ldab	#$C			;defino la tecla que limpia la calculadora
+
+	
+LOOP	equ	*
+	
+	ldy	#2
+rep1	%DIGTEC				;se hace un salto a la macro DIGTEC para obtener los digitos precionados
+	cmpa	#CLEAR			;comparo si la tecla precionada en el teclado fue la de CLEAN de la CALCULADORA
+	beq	RST
+
+	staa	0,x
+	inx
+
+
+	jsr	sub_err
+	bcs	erro			;si el detecto el carry en 1, es porque hubo error. El branch provoca que el programa se pause hasta incresar la tecla CLEAR
+	
+	dey
+	bne	rep1
+
+	jsr	print			;aca analiza el primer digito
+
+	%DIGTEC				;En este DIGTEC se carga el operador 
+	cmpa	#CLEAR			;comparo si la tecla precionada en el teclado fue la de CLEAN de la CALCULADORA
+	beq	RST
+
+	staa	0,x
+	inx
+	jsr	sub_err			;aca analiza que hay algun operador
+	bcs	erro			;si detecto el carry en 1 es porque hubo error. El branch provoca que el programa se pause hasta ingresar el CLEAR
+	
+
+
+	ldy	#2
+rep2	%DIGTEC				;se hace un salto a la macro DIGTEC para obtener los digitos precionados
+	cmpa	#CLEAR			;comparo si la tecla precionada en el teclado fue la de CLEAN de la CALCULADORA
+RST2	beq	RST
+
+	staa	0,x
+	inx
+	dey
+	bne	rep2
+	jsr	print
+
+erro	%DIGTEC				;En este DIGTEC se espera recibir la tecla del IGUAL
+	cmpa	#CLEAR			;comparo si la tecla precionada en el teclado fue la de CLEAN de la CALCULADORA
+	beq	RST2
+	staa	0,x
+	inx
+
+	jsr	RTA
+	bra	LOOP
+
+
+		
+fin	jmp	fin
+
+
+
+*****************************************************************************************
+*				SUBRUTINA TEC						*
+* Esta subrutina se encarga de encontrar la fila y la columna de la tecla precionada;	*
+* en caso de que no se encuentre esat subrutina se encontara en un constante 		*
+* ciclo de LOOPS hasta que encunetre que alguna tecla haya sido precionada		*
+*****************************************************************************************
+
+	org	$2100
+TEC	equ	*
+
+	psha
+	pshb				;se realiza un BackUp de todos los registros que se usaran en la subrutina
+	pshx
+	pshy
+
+*************************************************************************
+*			MASCARA DE FILA 0				*
+* En este apartado se coloca la mascara de la fila 0 en el puerto C	*
+*************************************************************************
+
+REPEAT	ldaa	#FIL0			;cargo en el registro A una de las mascaras a analizar en el puerto C
+	staa	PORTC			;almaceno la mascaras de la una fila 0 en el puerto C
+
+	ldaa	PORTC			;vuelvo a cargar en el registro A lo del puerto C que en el caso de que una tecla se haya precionado esta informacion se encontrara en el MSN
+	anda	#MASK1			;se le realiza una mascara al registro A para que quede solo el MSN y se pueda analizar los bits de ese Nybble
+	cmpa	#MASK1			;al compararlo con $F0 nosotros podemos saber si se preciono una tecla o solo se investigo dicha columna
+
+	beq	NADA1			;en el caso de que no se haya encontro una tecla precionada de esa fila se vuelve a realizar las mismas operaciones pero esta vez con diferenetes filas
+	
+	bra	DIF1			;en caso de que sea diferente la comparacion quiere decir que alguna tecla de esta fila se preciono
+
+NADA1	bra	LOOP1			;en caso de que no se haya encontardo tecla en esta fila, se busca la busca en otra fila
+
+DIF1	equ	*			;si es distinto el valor analizo esa fila
+	bra	SAVEFIL			;salto a guardar el valor de la fila que tiene la tecla precionada
+
+*************************************************************************
+*			MASCARA DE FILA 1				*
+* En este apartado se coloca la mascara de la fila 1 en el puerto C	*
+*************************************************************************
+LOOP1	ldaa	#FIL1
+	staa	PORTC
+	ldaa	PORTC
+
+	anda	#MASK1	
+	cmpa	#MASK1
+
+	beq	NADA2
+	
+	bra	DIF2
+
+NADA2	bra	LOOP2
+
+DIF2	equ	*	
+	bra	SAVEFIL
+
+*************************************************************************
+*			MASCARA DE FILA 2				*
+* En este apartado se coloca la mascara de la fila 2 en el puerto C	*
+*************************************************************************
+LOOP2	ldaa	#FIL2
+	staa	PORTC
+	ldaa	PORTC
+
+	anda	#MASK1	
+	cmpa	#MASK1
+
+	beq	NADA3
+	
+	bra	DIF3
+
+NADA3	bra	LOOP3
+
+DIF3	equ	*			
+	bra	SAVEFIL
+
+*************************************************************************
+*			MASCARA DE FILA 3				*
+* En este apartado se coloca la mascara de la fila 3 en el puerto C	*
+*************************************************************************
+LOOP3	ldaa	#FIL3
+	staa	PORTC
+	ldaa	PORTC
+
+	anda	#MASK1			
+	cmpa	#MASK1
+
+	beq	NADA4
+	
+	bra	DIF4
+
+NADA4	bra	REPEAT
+
+DIF4	equ	*					
+	bra	SAVEFIL			;en este caso como ya no existe otra fila consecutiva se vuelve a buscar la tecla desde la Fila 
+
+*********************************************************
+
+SAVEFIL	equ	*
+
+	staa	TECCOL			;almaceno la mascara de la columna de la tecla precionada en una variable local
+
+	ldaa	PORTC			
+	anda	#MASK2			;se le realiza una mascara al registro A para que quede solo el MSN y se pueda analizar los bits de ese Nybble
+	staa	TECFIL			;se almacena la fila de la tecla precionada en una variable local dentro de la memoria
+
+	puly
+	pulx				;devuelvo los registros usados en la subrtutina para que se restauren a como estaban antes del JSR
+	pulb
+	pula	
+	
+	rts				;vuelvo al main program
+
+******************************************************************************************
+*				SUBRUTINA VUELTA					*
+* Esta subrutina se encarga de analizar si la tecla se dejo de precionar		*
+*****************************************************************************************
+
+VUELTA	equ	*
+
+	psha
+	pshb				;se realiza un BackUp de todos los registros que se usaran en la subrutina
+	pshx
+	pshy
+
+*************************************************************************
+*			MASCARA DE FILA 0				*
+* En este apartado se coloca la mascara de la fila 0 en el puerto C	*
+*************************************************************************
+
+	ldaa	#FIL0			;cargo en el registro A una de las mascaras a analizar en el puerto C
+	staa	PORTC			;almaceno la mascaras de la una fila 0 en el puerto C
+
+	ldaa	PORTC			;vuelvo a cargar en el registro A lo del puerto C que en el caso de que una tecla se haya precionado esta informacion se encontrara en el MSN
+	anda	#MASK1			;se le realiza una mascara al registro A para que quede solo el MSN y se pueda analizar los bits de ese Nybble
+	cmpa	#MASK1			;al compararlo con $F0 nosotros podemos saber si se preciono una tecla o solo se investigo dicha columna
+
+	beq	NDA1			;si es cero, quiere decir que no hay tecla precionada en ESTA FILA, pero no sabemos las demas
+	bra	BUSC
+
+NDA1	bra	LP1			;en caso de que no se haya encontardo tecla en esta fila, se busca la busca en otra fila
+
+*************************************************************************
+*			MASCARA DE FILA 1				*
+* En este apartado se coloca la mascara de la fila 1 en el puerto C	*
+*************************************************************************
+
+LP1	ldaa	#FIL1
+	staa	PORTC
+	ldaa	PORTC
+
+	anda	#MASK1	
+	cmpa	#MASK1
+
+	beq	NDA2
+	bra	BUSC
+
+NDA2	bra	LP2
+
+*************************************************************************
+*			MASCARA DE FILA 2				*
+* En este apartado se coloca la mascara de la fila 2 en el puerto C	*
+*************************************************************************
+
+LP2	ldaa	#FIL2
+	staa	PORTC
+	ldaa	PORTC
+
+	anda	#MASK1	
+	cmpa	#MASK1
+
+	beq	NDA3
+	
+	bra	BUSC
+
+NDA3	bra	LP3
+
+*************************************************************************
+*			MASCARA DE FILA 3				*
+* En este apartado se coloca la mascara de la fila 3 en el puerto C	*
+*************************************************************************
+LP3	ldaa	#FIL3
+	staa	PORTC
+	ldaa	PORTC
+
+	anda	#MASK1			
+	cmpa	#MASK1
+
+	beq	NDA4
+	
+	bra	BUSC
+
+NDA4	bra	STOP			;si ya se analizo que en ninguna fila se encuentra alguna tecla precionada entonces el valor que trajo la anterior subrutina nos sirve de caso contario se vuelve a esperar a que se toque una tecla
+
+*********************************************************
+
+STOP	equ	*
+
+	sec				;si se dejo de precionar la tecla cargo el carry en 1 para usarlo como señal de validacion
+	
+BUSC	equ	*
+
+	puly
+	pulx				;devuelvo los registros usados en la subrtutina para que se restauren a como estaban antes del JSR
+	pulb
+	pula	
+	
+	rts				;vuelvo al main program
+
+*************************************************************************************************
+*					SUBRUTINA MATRIZ					*
+* Esta subrutina se encarga de tomar los valores de una matriz la cual contiene los diferentes 	*
+* valores que se pueden sumar, para ello se recibe por stack los valores de la fila y la columna*
+* de la tecla precionada y con esos valores se los busca en una matriz para conocer a que valor	*
+* se refiere											*
+*************************************************************************************************
+
+	org	$2500
+MATRIZ	equ	*
+
+	pshb
+	pshx				;se hace back up de los registros
+	pshy
+
+
+	ldx	#DIRMAK1		;cargo en el registro X una posicion de memoria la cual se usara como puntero de sobre las mascaras de FILA	
+	ldy	#DIRMAK2		;cargo en el registro X una posicion de memoria la cual se usara como puntero de sobre las mascaras de COLUMNA
+	clrb				;limpio lo del registro B para usarlo como contador y conocer el numero de fila de la tecla precionada
+
+	ldaa	TECFIL			;cargo en el registro A la mascara de la fila de la tecla precionada
+L06	cmpa	0,x			;comparo ese valor con las diferentes mascaras de la fila
+	
+	beq	L05			;analizo si la comparacion del registro con la mascara fue cero, en caso de que lo sea nos estaria indicando a traves del contador del registro B en numero de fila
+
+	incb				;en caso de que la comparacion no haya sido cero quiere decir quiere decir que todavia no encontro el numero de la fila precionada
+	inx				;se incrementa el registro X para que se compare la mascara de la fila con otra mascara
+	bne	L06			;branch if not = zero
+
+
+L05	stab	NFIL			;una vez que se encontro el numero de la fila precionada se guarda dicho valor en una variable local
+
+
+	clrb				;limpio lo del registro B para usarlo como contador de columnas
+	
+	ldaa	TECCOL			;cargo en el registro A la mascara de la columna de la tecla precionada
+L08	cmpa	0,y			;comparo el registo A con las diferentes mascaras de columnas
+
+	beq	L07			;analizo si la comparacion del registro con la mascara fue cero, en caso de que lo sea nos estaria indicando a traves del contador del registro B el numero de columnas
+
+	incb				;en caso de que la comparacion no haya sido cero quiere decir quiere decir que todavia no encontro el numero de la columna precionada
+	iny				;se incrementa el registro Y para que se compare la mascara de la columna con otra mascara
+	bne	L08			;branch if not = zero
+	
+
+
+L07	stab	NCOL			;en caso de haya sido cero la comparacion quiere decir que se encontro el numero de columna y se almacena dicho valor en una variable local
+
+*********************************************************************************
+*				MATRIZ						*
+* Ahora que ya sabemos el numero de la fila y columna de la tecla precionada,	*
+* mediante operaciones aritmeticas obtenemos esos valores de una matriz		*
+* Esta subrutina me devuelve el valor de la tecla precionada por el Reg.A	*
+*********************************************************************************
+
+
+	ldx	#RAM			;cargo en el registro X la posicion de comienzo de la MATRIZ
+	ldaa	NCOL			;cargo en el registro A el numero de columna de la tecla
+	ldab	#ASIZE			;cargo en el registro B el tamaño de los elementos de la matriz
+
+	mul				;al multiplicar el Reg. A y el Reg. B consigo obtener la cantidad posiciones de memoria que esta desplazado el valor
+	abx				;al sumar dicho valor obtenido de posiciones desplazadas al registro X consigno posicionar "verticalmeente" el puntero en cuanto a valor a buscar
+
+	ldaa	NFIL			;cargo en el registro A el numero de la fila el cual se encuentra el valor a buscar
+	ldab	#FIL			;cargo en el registro B el numero de filas de la matriz
+
+	mul				;al multiplicar estos resgistros se consigue obtener el desplazamiento horizontal del valor
+	abx				;sumandolo al registro X obtenemos a nuestro puntero X posicionado sobre el valor a buscar
+
+	
+	ldaa	0,x			;ahora que el puntero X esta posicionado en el valor a buscar, alamceno dicho valor en un registro
+	
+	puly
+	pulx				;devuelvo los registros utilizados
+	pulb
+
+	rts				;retorno al main program
+
+
+
+
+*****************************************************************************************
+*				SUBRUTINA CONVERSOR A NÚMEROS				*
+* Esta subrutina se encarga de convertir los dígitos enviados por stack a los números	*
+* de dos digitos para operar con estos							*
+*****************************************************************************************
+	
+	ORG	$2700
+num_obt	EQU	*			;no se pushea al stack el AccIY ya que lo utilizaremos como FramePointer
+			
+	pshb
+	pshx				;se hace back up de los registros
+	pshy
+	psha
+
+	ldx	#ARRAY2			;se define la posicion de inicio del ARRAY2 en el cual se guardan los digitos que son precionados del teclado
+	ldy	#ARRAY3			;se define la posicion de inicio del ARRAY3 en el cual se guardan los numeros que fueron precionados en el teclado (NUM1= Dig1+Dig2)
+
+	ldaa	0,x 			;se obtiene el primer digito del primer numero, lo multiplico por 10 para dejarlo como primer digito
+	ldab	#10	
+	mul				;de esta forma se guarda en AccB y solo me falta sumarle el primer digito y obtengo el primer numero
+
+	ldaa	1,x			;se obtiene el segundo digito del primer número, y lo sumo con AccB para obtener el numero completo
+	aba
+	staa	0,y			;primer numero se guarda en el STACK
+
+
+
+	ldaa	3,x			;repito la misma operacion con el sengundo número
+	ldab	#10
+	mul
+
+	ldaa	4,x	
+	aba
+	staa	1,y			;lo guardo seguido al primer número en el stack
+
+	pula
+	puly
+	pulx
+	pulb
+	
+	rts
+
+
+
+*****************************************************************************************
+*				SUBRUTINA OPERAR					*
+* Esta subrutina realiza la operación de operación y pasaje a display			*
+*****************************************************************************************
+operar	equ	*
+	psha				
+	pshb
+	
+	ldaa	OPE			;se buscará que operación se pidió
+	cmpa	#SUMA			;se hace usa una máscara para ver si es una suma
+	bne	no_sum			;en caso que no lo sea, se seguirá con la resta
+
+	jsr	sum			;en caso que lo sea, se irá a la subrutina que hará la suma
+	bra	rslt			;una vez sumado, se pasará a pasarlo por display
+
+no_sum	cmpa	#RESTA			;se hace usa una máscara para ver si es una resta
+	bne	no_res			;en caso que no lo sea, será una multiplicación
+
+	jsr	rest			;en caso que lo sea, se irá a la subrutina que hará la resta
+	bra	rslt			;se pasará por display
+
+no_res	cmpa	#MULT			;se hace usa una máscara para ver si es una mutiplicación
+	bne	no_mult
+
+	jsr	multi			;en caso que lo sea, se irá a la subrutina que hará la multiplicación
+	bra	rslt
+
+no_mult	cmpa	#DIV
+	bne	ERROR				;en caso que no lo sea, es un error
+
+	jsr	divi
+
+rslt	jsr	HexABCD			;subrutina que descompone el resultado en hexadecimal en sus dígitos para pasarlos por el display
+
+	jsr	dsply
+
+	pulb
+	pula
+
+	rts
+*****************************************************************************************
+*				SUBRUTINA ERROR						*
+* analiza que el primer digito no sea un operando luego analiza que el primer valor 	*
+* ingresado no sea de tres digitos        						*
+*****************************************************************************************
+ 
+sub_err equ     *
+
+        pshb
+        psha
+        pshx
+*****************************************************************
+*	Analisis de los digitos del primer Numero		*
+* Verifica que los digitos del primer numero no coincidan	*
+* con ningun operador						*
+*****************************************************************
+
+	ldx    #ARRAY2				;cargo en B el valor del primer digito con todos los operando
+	ldaa	#2
+GOT1	ldab	0,x
+
+        cmpb    #SUMA     			;comparo la tecla c/ los operando, si coinciden salto al error
+        beq	ERROR	   			;salto a error si da 0, encontrÃƒÂ³ una coincidencia.
+        cmpb    #RESTA      			;comparo con resta
+        beq	ERROR		    
+	cmpb	#DIV				;comparo con divisio
+	beq	ERROR
+        cmpb    #MULT      			;comparo con multi
+        beq	ERROR		  
+	cmpb	#IGUAL
+	beq	ERROR
+
+	inx
+	deca
+	bne	GOT1
+	
+*********************************************************
+*		Analisis del Operador			*
+* Se analiza que se haya colocado algun operador	*
+*********************************************************
+
+        ldab    #8				;contador 
+        ldaa    $4202				;cargo en A el valor de la tercera tecla (OPERADOR)
+        ldx     #RAM				;apunta x en el inicio de el teclado ("0" a "9")
+z1      cmpa    1,x     
+        beq    ERROR				;lo encontrÃƒÂ³, salto a error
+        inx 					;decremento los desplazamientos de busqueda
+        decb
+        bne	z1				;si no encontre el 9 sigo buscando
+
+*********************************************************
+*		Analisis del segundo numero		*
+* Se analiza que los digitos del segundo numero no	*
+* coincidan con ningun operador				*
+*********************************************************
+
+	ldx    #$4203				;cargo en x un puntero para analizar los digitos del segundo numero (digito 4 y digito 5)
+	ldaa	#2				;contador con las veces que se analizara el segundo numero (una para cada digito)
+GOT2	ldab	0,x
+
+        cmpb    #SUMA     			;comparo la tecla c/ los operando, si coinciden salto al error
+        beq	ERROR	   			;salto a error si da 0, encontrÃƒÂ³ una coincidencia.
+        cmpb    #RESTA      			;comparo con resta
+        beq	ERROR		    
+	cmpb	#DIV				;comparo con divisio
+	beq	ERROR
+        cmpb    #MULT      			;comparo con multi
+        beq	ERROR		  
+	cmpb	#IGUAL
+	beq	ERROR
+
+
+	inx
+	deca
+	bne	GOT2
+	clc					;en caso de no haber error se limpia el carry
+	bra	FIN
+
+*********************************************************
+*		EN CASO DE HABER ERROR			*
+* Envia al display la palabra "ERRO"			*					
+*********************************************************
+
+ERROR   equ	*
+
+	ldaa	#'E'				;cargo en A la primera letra 
+	ldab	#3				;cargo en la letra en la primera posicion del display
+	jsr	outchar				;envio la letra al display
+		
+	ldaa	#'R'				;cargo en A la segunda letra 
+	ldab	#2				;cargo en la letra en la segunda posicion del display
+	jsr	outchar				;envio la letra al display
+
+	ldaa	#'R'				;cargo en A la tercera letra 
+	ldab	#1				;cargo en la letra en la tercera posicion del display
+	jsr	outchar				;envio la letra al display
+
+	ldaa	#'O'				;cargo en A la cuarta letra 
+	ldab	#0				;cargo en la letra en la cuarta posicion del display
+	jsr	outchar				;envio la letra al display
+	
+	sec					;en caso de error devuelve el carry en 1				
+
+*********************************************************
+*		EN CSAO DE NO HABER ERROR		*
+* Retorna al programa principal				*		
+*********************************************************
+
+
+FIN	equ	*
+
+        pulx
+        pula
+        pulb
+
+        rts
+*****************************************************************************************
+*				SUBRUTINA SUMA						*
+* Esta subrutina realiza la operacion de suma en caso de que esa sea la seleccionada	*
+* por el usuario									*
+* Toma el numero 1 seleccionado y el numero 2, los carga en los registros A y B 	*
+* respectivamente para sumar dichos registros. 						*
+* el resultado se guarda en la posición de memoria "RES": $3020+$3021			*							
+*****************************************************************************************		
+
+sum	equ	*
+	psha
+	pshb
+	
+	clr	NEGATIV
+
+	ldaa	NUM1	;Se realiza la suma 
+	ldab	NUM2
+	aba
+	tab
+	clra
+	std	RES			;Pos=$3020+$3021
+
+	pulb
+	pula
+
+	rts
+	
+*****************************************************************************************
+*				SUBRUTINA RESTA						*
+* Esta subrutina realiza la operacion de resta en caso de que sea la seleccionada por el*
+* usuario										*
+* Toma el numero 1 seleccionado y el numero 2, los carga en los registros A y B 	*
+* respectivamente para relizar la resta de dichos registros. 				*
+* el resultado se guarda en la posición de memoria "RES": $3020+$3021			*							
+*****************************************************************************************
+
+rest	equ	*
+	psha
+	pshb
+	
+	clr	NEGATIV
+
+	ldaa	NUM1
+	ldab	NUM2
+	sba
+	
+	bhi	posi			;en caso de que el número sea negativo, se añadirá un menos en el display
+	
+	staa	NEGATIV
+	nega
+	
+posi	tab
+	clra
+	std	RES
+
+	pulb
+	pula
+
+	rts
+
+*****************************************************************************************
+*				SUBRUTINA DIVISIÓN					*
+* Esta subrutina realiza la operación de división, no pasando por el display el resto ni*
+* el digito seguido de la coma. Toma el numero 1 y lo divide por el numero 2, cargandolo*
+* en el AccD para realizar la operación correctamente, luego guardandolo en "RES"	*
+*****************************************************************************************
+
+divi	psha
+	pshb
+	pshx
+
+	clr	NEGATIV
+
+	ldx	#00		; Se pone en el AccIX el Numero 2
+	ldab	NUM2
+	beq	ERROR1		; Imprime error en la pantalla si dividis por 0
+	abx
+
+	clra			; Limpia el AccA y guarda en AccB el primer número para de esta manera poder realizar la
+	ldab	NUM1		; división correctamente en el AccD con el AccIX. Se intercambian los valores de los Acumuladores
+
+	idiv			; ya que necesito guardar el resultado en RES			
+	xgdx
+
+	std	RES
+	bra	goto4
+
+ERROR1  equ	*
+
+	ldaa	#'E'				;cargo en A la primera letra 
+	ldab	#3				;cargo en la letra en la primera posicion del display
+	jsr	outchar				;envio la letra al display
+		
+	ldaa	#'R'				;cargo en A la segunda letra 
+	ldab	#2				;cargo en la letra en la segunda posicion del display
+	jsr	outchar				;envio la letra al display
+
+	ldaa	#'R'				;cargo en A la tercera letra 
+	ldab	#1				;cargo en la letra en la tercera posicion del display
+	jsr	outchar				;envio la letra al display
+
+	ldaa	#'O'				;cargo en A la cuarta letra 
+	ldab	#0				;cargo en la letra en la cuarta posicion del display
+	jsr	outchar				;envio la letra al display
+	
+	pulx
+	pulb
+	pula
+
+	jmp	erro
+
+goto4	equ	*	
+	pulx
+	pulb
+	pula
+
+	rts
+
+*****************************************************************************************
+*				SUBRUTINA MULTIPLICACIÓN				*
+* Esta subrutina realiza la operacion de mutiplizacion en caso de que sea la 		*
+* seleccionada por el usuario	
+* Toma el numero 1 seleccionado y el numero 2, los carga en los registros A y B 	*
+* respectivamente para relizar la multiplicacion de dichos registros. 			*
+* el resultado se guarda en la posición de memoria "RES": $3020+ $3021			*
+*****************************************************************************************
+
+multi	psha
+	pshb
+	
+	clr	NEGATIV
+
+	ldaa	NUM1		;Se carga el numero 1 en AccA y el numero 2 en AccB para poder realizar la operación
+	ldab	NUM2		;de multiplicación de manera mas sencilla con la operación "mul". Luego solo es necesario
+	mul			;almacenar el AccD en RES que ya esta diseñado para admitir 2 bytes
+	std	RES
+
+	pulb
+	pula
+
+	rts
+
+
+*****************************************************************************************
+*			SUBRUTINA CONVERSOR DE HEXADECIMAL A ASCII EN DECIMAL		*
+* Esta subrutina descompone un número de 2 bytes a 4 bytes con los primeros 4 dígitos de*
+* un número en decimal									*
+*****************************************************************************************
+
+HexABCD	equ	*
+	psha
+	pshb
+	pshx
+
+	ldd	RES		;se carga en AccD el resultado de la operación así se divide y se transforma en BCD. se transforma en BCD dentro de las variables dig1, dig2, dig3,dig4 para que sea
+	ldx	#10		;más fácil pasarlo por el display.
+	idiv			;se divide por 10, y se van guardando los restos, que son los digitos enteros, a pasar
+	stab	dig1		;por el display.
+	xgdx			;se termina de pasar el primer digito y se pasa el resultado entero al AccD
+
+	ldx	#10		;a continuación se repite el mismo proceso pero con los siguientes dígitos
+	idiv
+	stab	dig2
+	xgdx
+
+	ldx	#10
+	idiv
+	stab	dig3
+	xgdx
+
+	ldx	#10
+	idiv
+	stab	dig4
+
+	pulx
+	pulb
+	pula
+
+	rts
+
+*****************************************************************************************
+*		SUBRUTINA DE PASAJE AL DISPLAY						*
+* Esta subrutina realiza el pasaje al display con los digitos ya obtenidos	
+*
+*****************************************************************************************
+
+dsply	equ	*
+	psha		
+	pshb	
+	
+	ldaa	dig1		
+	ldab	#$30
+	aba
+	ldab	#0
+
+	jsr	outchar
+
+	ldaa	dig2
+	ldab	#$30
+	aba
+	ldab	#1
+
+	jsr	outchar
+
+	ldaa	dig3
+	ldab	#$30
+	aba
+	ldab	#2
+
+	jsr	outchar
+
+	tst	NEGATIV
+	beq	positiv
+
+	jsr	negat
+	bra	goto3
+
+positiv	ldaa	dig4
+	ldab	#$30
+	aba
+	ldab	#3
+
+goto3	jsr	outchar
+
+	pulb
+	pula
+
+	rts
+
+*****************************************************************************************
+*				SUBRUTINA PRINT						*
+* Esta subrutina se encarga de mandar al display los numeros que se van escribiendo 	*
+* en el teclado										*
+* Para converti los digitos precionados a caracter ASCII lo que se hace es sumarle $30	*
+* al numero que se tiene en decimal. Esto quedaria de la siguiente manera		*
+*       Reg. A (digito precionado)  + ($30)   = El digito en caracter ASCII		*
+* Esto nos premite imprimir los digitos que se van precinando en el display		*
+*****************************************************************************************
+print	equ	*
+	pshx
+	psha				;hago back up de los registros
+	pshb
+	
+	ldx	#ARRAY2			;cargo en X un puntero que contiene el array en el cual se encuentra los digitos precionado
+
+	ldaa	3,x			;analizo si es cero el 1 y 2 digito del segundo numero, ya que en caso de que lo fuera es porque todavia no se lo cargo con el teclado
+	bne	SEGNUM
+	ldaa	4,x
+	bne	SEGNUM
+
+
+
+	ldaa	0,x			;cargo el primer digito precinado en el registro A
+	ldab	#$30			
+	aba				;obtengo el primer digito en ASCII
+
+	ldab	#1			
+	jsr	outchar
+
+	ldaa	1,x			;cargo el segundo digito precionado en el registro A
+	ldab	#$30
+	aba				;convierto el segundo digito en ASCII
+
+	ldab	#0
+	jsr	outchar
+
+	bra	EXIT
+
+SEGNUM	equ	*
+	ldaa	3,x
+	ldab	#$30
+	aba	
+
+	ldab	#1
+	jsr	outchar
+
+	ldaa	4,x
+	ldab	#$30
+	aba
+
+	ldab	#0
+	jsr	outchar
+
+
+
+EXIT	equ	*
+	pulb
+	pula
+	pulx
+
+	rts
+
+
+
+
+*****************************************************************************************
+*		SUBRUTINA VALOR NEGATIVO						*
+* Esta subrutina crea un "-" frente al display para indicar que el valor es negativo	*
+*****************************************************************************************
+negat	equ	*
+	psha
+	pshb
+
+	ldaa	#$2D
+	ldab	#3
+	jsr	outchar
+
+	pulb
+	pula
+
+	rts
+
+
+*****************************************************************************************
+*		SUBRUTINA RESPUESTA
+* texto
+*****************************************************************************************
+RTA	equ	*
+
+	psha
+	pshb
+	pshx
+	
+	ldab	#IGUAL
+
+ESPERA	ldaa	$4205			;carga en el registro A la posicion la cual se encuentra el caracter del IGUAL
+
+	cba
+	bne	ESPERA			;si no es cero espera a que se coloque la tecla de igual para dar el resultado por el display
+
+
+	jsr	num_obt			;se hace un salto a la subrutina que se encarga de unir los digitos que fueron precionados del teclado y convertirlos en numeros de dos digitos
+	jsr	operar
+
+
+	pulx
+	pulb
+	pula
+
+	rts
+
+
+*************************************************************************************************************************
+*				LIMPIEZA DEL DISPLAY									*
+* 		Esta subrutina se encarga de la limpieza del display							*
+*************************************************************************************************************************
+clear	equ	*
+
+	psha
+	pshb
+
+	ldaa	#''
+	ldab	#3			;esta subrutina se encarga de imprimir espacios en todas las posiciones del display
+	jsr	outchar			;para que este se limpie en caso de que algun caracter este impreso
+	
+	ldaa	#''
+	ldab	#2			;esta subrutina solo se ejecuta una unica vez y es depues de hacer un salto a la subrutina
+	jsr	outchar			;que va a imprimir la palabra en el display
+
+	ldaa	#''
+	ldab	#1
+	jsr	outchar
+
+	ldaa	#''
+	ldab	#0
+	jsr	outchar	
+
+	pulb
+	pula
+	
+	rts	
+
+
+
+************************************************************************************************************************
+*			DELAY												*
+* 	Se crea un looop para hacer un delay de 0,5 s									*
+* 	Esta subrutina DELAY cuenta con dos LOOPS, uno interno el cual esta esta dado mediante el 			*
+*	rotulo de LOOP1 y un LOOP externo el cual ejecuta este LOOP INTERNO una cierta cantidad de veces		*
+* 	dando lugar a un delay de 0,5 segundos										*
+*************************************************************************************************************************
+
+DELAY	equ	*		
+
+	pshx				Hago backup de los registros
+	pshy				X y Y
+
+	ldy	#15			Cargo el valor de repeticiones del Loop "Mayor"	
+GOTO2	ldx	#62497			Cargo el valor de repeticiones del loop "Interno"	
+
+GOTO1	dex				Decremento el contador
+	nop				No Operation (Suma ciclos)
+	bne	GOTO1			Salto si no es cero
+
+	dey				Decremento contador de loop 
+	bne	GOTO2			Salto a LOOP2
+	
+	puly				Reseteo los registros X y Y
+	pulx				
+	
+	rts				Regreso al programa principal
+
+*****************************************************************************************
+*				SUBRUTINA INITDIS					*
+* Esta subrutina se encarga de inicializar correctamete el DISPLAY y el TECLADO del HC11*
+*****************************************************************************************
+
+	org	$2300
+initdis	equ	*
+	psha
+	ldaa	#$0F	;set for input/output
+	staa	DDRC	;C output
+	ldaa	PIOC	;get current value
+	anda	#$FE	;reset bit 0 to 0
+	staa	PIOC	;send it out
+	pula
+	rts
+
+*****************************************************************************************
+*				SUBRUTINA OUTCHAR					*
+* Esta subrutina se encarga de mandar al display un caracter y su respectiva posicion	*
+* dentro del display. ACCB: Posición (0-3)						*
+*****************************************************************************************
+
+outchar	equ	*
+	stab	PORTCL	;set the position 
+	staa	PORTB	;set the character
+	rts
+*****************************************************************
+*			RESERVA DE MEMORIA			*
+* En este apartado del programa se reserva la memoria destinada	*
+* para el correcto funcionamiento del programa			*
+*****************************************************************
+	org	STACK		
+	rmb	30			;reservo memoria para uso del STACK
+STK_INI	equ	*-1
+
+	org	RAM
+	rmb	FIL*COL*ASIZE		;reservo memoria para uso de la MATRIZ
+
+	org	ARRAY2			
+	rmb	15			;reservo memoria del array que se encarga de guardar los digitos del teclado
+
+	ORG	ARRAY3
+	rmb	15			;reservo memoria del array que se encarga de guardar los numero del teclado
+
+	END

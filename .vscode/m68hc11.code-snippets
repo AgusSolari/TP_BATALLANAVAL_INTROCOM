@@ -1,0 +1,253 @@
+{
+	// Place your NEWUSER workspace snippets here. Each snippet is defined under a snippet name and has a scope, prefix, body and 
+	// description. Add comma separated ids of the languages where the snippet is applicable in the scope field. If scope 
+	// is left empty or omitted, the snippet gets applied to all languages. The prefix is what is 
+	// used to trigger the snippet and the body will be expanded and inserted. Possible variables are: 
+	// $1, $2 for tab stops, $0 for the final cursor position, and ${1:label}, ${2:another} for placeholders. 
+	// Placeholders with the same ids are connected.
+	//	HOLAAAA, rafaaaaaaaaaa
+	// Example:
+	// "Print to console": {
+	// 	"scope": "javascript,typescript",
+	// 	"prefix": "log",
+	// 	"body": [
+	// 		"console.log('$1');",
+	// 		"$2"
+	// 	],
+	// 	"description": "Log output to console"
+	// }
+
+	"for-reg": {
+		"scope": "z80-macroasm",
+		"prefix": "repite-for-registro",
+		"body": [
+			"\tldaa\t#${2:VECES}\t\trepeticiones del contador (va en el main, loop o lo que sea)",
+			"repite\t${4:codigo}",
+			"\t",
+			"\tdeca",
+			"\tbne\trepite"
+		],
+		"description": "crea un for de n ciclos, el contador se en el registro A"
+	},
+	"for-mem": {
+		"scope": "z80-macroasm",
+		"prefix": "repite-for-memoria",
+		"body": [
+			"${1:cont1}\tRMB\t1\t\treservo un byte de memoria para el contador (va abajo, y p.ej org \\$0060)",
+			"",
+			"",
+			"\tldaa\t#${2:VECES}\t\trepeticiones del contador (va en el main, loop o lo que sea)",
+			"\tstaa\t${1:cont1}\t\tguardo las repeteciones en la variable",
+			"repite\t${4:codigo}",
+			"\t",
+			"\tdec\t${1:cont1}",
+			"\tbne\trepite"
+		],
+		"description": "crea un for de n ciclos, el contador se guarda en memoria"
+	},
+
+	"Org-pos": {
+	 	"scope": "z80-macroasm",
+	 	"prefix": "org-pos",
+	 	"body": [
+	 		"ORG\t\\$${0:0000}",
+	 	],
+		"description": "set org zone"
+	},
+
+	"Main": {
+		"scope": "z80-macroasm",
+		"prefix": "main",
+		"body": [
+			"\tORG\t\\$2000",
+			"main\tEQU\t*",
+			"\t$0",
+		],
+	       "description": "set org zone"
+       },
+
+       "Fin": {
+	"scope": "z80-macroasm",
+	"prefix": "fin",
+	"body": [
+		"fin\tjmp\tfin",
+	],
+       "description": "fin del programa"       
+	},
+
+	"Constante": {
+		"scope": "z80-macroasm",
+		"prefix": "const",
+		"body": ["${1:NAME}\tEQU\t${0:10}"],
+	       "description": "declarar una constante tipo #DEFINE"
+	},
+
+	"StackData": {
+		"scope": "z80-macroasm",
+		"prefix": "stack-data",
+		"body": [
+			"\tORG\t\\$${1:0000}\t\tFLACO ESTO VA AL FINAL DEL CODIGO",
+			"stack\tRMB\t${2:size}",
+			"stk_ini\tEQU\t*-1",
+		],
+	       "description": "coloco los datos del stack"
+	},
+
+	"swap-d-x": {
+		"scope": "z80-macroasm",
+		"prefix": "swap-d-x",
+		"body": [
+			"xgdx\t\tX<-->D",
+		],
+	       "description": "intercambia el registro X con el D"
+	},
+
+	"variable-global-rmb": {
+		"scope": "z80-macroasm",
+		"prefix": "var-global-rmb",
+		"body": [
+			"\tORG\t\\$${1:0000}",
+			"${2:nombre}\tRMB\t${0:1}",
+		],
+	},
+
+	"BVS": {
+		"scope": "z80-macroasm",
+		"prefix": "branch-overflow-set-BVS",
+		"body": ["${1:bvs}\t${0:goto}\t\tbranch if overflow set",],
+	},
+	"BVC": {
+		"scope": "z80-macroasm",
+		"prefix": "branch-overflow-clear-BVC",
+		"body": ["${1:bvc}\t${0:goto}\t\tbranch if overflow clear",],
+	},
+	"BNE": {
+		"scope": "z80-macroasm",
+		"prefix": "branch-not-zero-BNE",
+		"body": ["${1:bne}\t${0:goto}\t\tbranch if not = zero",],
+	},
+	"BEQ": {
+		"scope": "z80-macroasm",
+		"prefix": "branch-zero-beq",
+		"body": ["${1:beq}\t${0:goto}\t\tbranch if = zero",],
+	},
+	"BPL": {
+		"scope": "z80-macroasm",
+		"prefix": "branch-positive-bpl",
+		"body": ["${1:bpl}\t${0:goto}\t\tbranch if positive (N=0)",],
+	},
+	"BMI": {
+		"scope": "z80-macroasm",
+		"prefix": "branch-negative-bmi",
+		"body": ["${1:bmi}\t${0:goto}\t\tbranch if negative (N=1)",],
+	},
+	"BCC": {
+		"scope": "z80-macroasm",
+		"prefix": "branch-carry-clear-bcc",
+		"body": ["${1:bcc}\t${0:goto}\t\tbranch if carry clear (C=0)",],
+	},
+	"BCS": {
+		"scope": "z80-macroasm",
+		"prefix": "branch-carry-set-bcs",
+		"body": ["${1:bcs}\t${0:goto}\t\tbranch if carry set (C=1)",],
+	},
+	"BRA": {
+		"scope": "z80-macroasm",
+		"prefix": "branch-always-bra",
+		"body": ["${1:bra}\t${0:goto}\t\tbranch always",],
+	},
+
+
+
+	"sblock-comment": {
+		"scope": "z80-macroasm",
+		"prefix": "small-block-comment",
+		"body": [
+			"*********************************************************",
+			"*\t\t${1:TITULO}",
+			"* ${2:texto}",
+			"*********************************************************",
+		],
+	},
+	"bblock-comment": {
+		"scope": "z80-macroasm",
+		"prefix": "big-block-comment",
+		"body": [
+			"*****************************************************************************************",
+			"*\t\t${1:TITULO}",
+			"* ${2:texto}",
+			"*****************************************************************************************",
+		],
+	},
+	"consigna-comment": {
+		"scope": "z80-macroasm",
+		"prefix": "consigna-comment",
+		"body": [
+			"*****************************************************************************************************************",
+			"*\t\tTP2\tEJERCICIO ${1:0}\t\t\tGRUPO 1\t\t\t\t\t\t\t*",
+			"*\t\t\t\t\t\t\t\t\t\t\t\t\t\t*",
+			"* Consigna:\t\t\t\t\t\t\t\t\t\t\t\t\t*",
+			"*",
+			"*****************************************************************************************************************",
+		],
+	},
+
+	
+	"include": {
+		"scope": "z80-macroasm",
+		"prefix": "include",
+		"body": ["$$..\\NEWUSER\\\\${1:FILE}.MSA"],
+	},
+
+	"backups": {
+		"scope": "z80-macroasm",
+		"prefix": "backups",
+		"body": [
+			"*\tpsha",
+			"*\tpshb",
+			"*\tpshy",
+		],
+	},
+	"devolver-backups": {
+		"scope": "z80-macroasm",
+		"prefix": "devolver-backups",
+		"body": [
+			"*\tpuly",
+			"*\tpulb",
+			"*\tpula",
+		],
+	},
+
+	"void-func": {
+		"scope": "z80-macroasm",
+		"prefix": "void-func",
+		"body": [
+			"\tORG\t\\$${1:0000}",
+			"${2:func}\tEQU\t*",
+			"\tpshx\t\tbackup de X",
+			"\ttsx\t\tX=SP+1",
+			"${3:backups}",
+			"",
+			"*\tcodigo",
+			"",
+			"${4:devolver-backups}",
+			"\tpulx",
+			"\trts",
+		],
+		"description": "Una función que no retorna valores"
+	},
+
+	"form constant character": {
+		"scope": "z80-macroasm",
+		"prefix": "FCC",
+		"body": "${1:strName}\tFCC\t${2:'CADENA DE TEXTO'}",
+		"description": "arma una str char pa"
+	},
+
+	"form constant byte": {
+		"scope": "z80-macroasm",
+		"prefix": "FCB",
+		"body": "${1:name}\tFCB\t$20,$0,$02",
+		"description": "arma un byte array pa"
+	}
+}

@@ -1,0 +1,474 @@
+	p68h11
+******* Ports ***************************
+DDRC	equ	$1007		;data direction register for C
+PIOC	equ	$1002		;for strobe B assertion change
+PORTCL	equ	$1005 		;port C latched
+PORTB	equ	$1004 		;port B
+PORTC	equ	$1003 		;rows
+******* Cols and Row Ports **************
+ROWS	equ	PORTC 		;outputs
+COLS	equ	PORTCL 		;inputs
+***** Row Masks *************************
+FIL0	equ	00001110b	;mascaras para manejo de filas
+FIL1	equ	00001101b
+FIL2	equ	00001011b
+FIL3	equ	00000111b
+
+COL0	equ	11100000b
+COL1	equ	11010000b
+COL2	equ	10110000b
+COL3	equ	01110000b
+
+****** Keyboard Mask ********************
+STACK	equ	$3500
+ARRAY	equ	$0010
+MASK1	equ	$F0
+MASK2	equ	$0F
+DIRMAK1	equ	$3040
+DIRMAK2	equ	$3030
+TECFIL	equ	$3029			;se definen TECFIL y TECCOL como variables locales las cuales conservaran momentanemante la fila y la columna
+TECCOL	equ	$3028			; de la tecla precionada
+
+RAM	equ	$4000
+FIL	equ	4		;defino una variable con la cantidad de filas de la matriz
+COL	equ	4		;defino una variable con la cantidad de columnas de la matriz
+ASIZE	equ	1		;defino una variable con el tamaño de los elementos de la matriz
+NFIL	equ	$3027
+NCOL	equ	$3026
+VAL1	equ	$3025
+
+****** Variables locales y constantes********
+SUMA	equ	$BB
+RESTA	equ	$B7
+MULT	equ	$7B
+MSBres	equ	$301F	
+LSBres	equ	$3020
+dig1	equ	$3021
+dig2	equ	$3022
+dig3	equ	$3023
+dig4	equ	$3024
+
+	org	RAM
+	fcb	0,1,2,3,4,5,6,7,8,9,$A,$B,$C,$D,$E,$F	;se cargan en la matriz los elementos
+
+	org	DIRMAK1
+	fcb	FIL0,FIL1,FIL2,FIL3	;mediante la instruccion FCB cargo de manera consecutiva las diferentes marscaras que se usaran para realizar operaciones con las FILAS
+
+	org	DIRMAK2
+	fcb	COL0,COL1,COL2,COL3	;cargo de manera consecutiva las mascaras de las columnas a partir del putero Y
+
+	MACRO	%DIGTEC
+	jsr	FILA		;esta subrutina se encarga de encontrar la fila de la tecla precionada y almacenaral en una variable local
+	jsr	COLU		;esta subrutina se encarga de encontrar la columna de la tecla precionada y alamcenarla en una varible local
+	jsr	MATRIZ		;esta subrutina se encarga de obtener el valor del teclado a partir de la fila y columna encontrada
+	ENDMAC
+
+
+
+*****************************************************************************************
+*		MAIN PROGRAM
+* Programa Principal
+*****************************************************************************************
+
+	org	$2000
+main	equ	*
+	lds	#STK_INI
+	jsr	initdis
+
+	ldx	#$4200
+	ldab	#6
+	
+LOOP	%DIGTEC
+	staa	0,x
+	inx
+	cmpa	
+
+	decb
+	bne	LOOP		branch if not = zero
+
+
+
+*********************************************************
+*		Resultado				*
+* En las siguientes lineas se hace la operación y se	*
+* realiza el pasaje al display				*
+*********************************************************
+	
+	ins			;Se crean 2 espacios en el stack donde se guardarán los números seleccionados
+	ins
+	tsy			;creo un Frame Pointer que se utilizara para manejar los caracteres dados
+
+	jsr	num_obt		;Subrutina que convierte los dígitos dados en números para realizar la operación
+
+	ldaa	4,y		;se buscará que operación se pidió
+	cmpa	#SUMA		;se hace usa una máscara para ver si es una suma
+	bne	no_sum		;en caso que no lo sea, se seguirá con la resta
+
+	jsr	sum		;en caso que lo sea, se irá a la subrutina que hará la suma
+	bra	resul		;una vez sumado, se pasará a pasarlo por display
+
+no_sum	cmpa	#RESTA		;se hace usa una máscara para ver si es una resta
+	bne	no_res		;en caso que no lo sea, será una multiplicación
+
+	jsr	res		;en caso que lo sea, se irá a la subrutina que hará la resta
+	bra	resul		;se pasará por display
+
+no_res	cmpa	#MULT		;se hace usa una máscara para ver si es una mutiplicación
+*	bne	error		;en caso que no lo sea, es un error
+	
+	jsr	mul		;en caso que lo sea, se irá a la subrutina que hará la multiplicación
+
+resul	jsr	HexABCD		;subrutina que descompone el resultado en hexadecimal en sus dígitos para pasarlos por el display
+
+	jsr	dsply
+
+fin	jmp	fin
+
+
+
+
+
+	
+*********************************************************************************
+*				SUBRUTINA FIL					*
+* Esta subrutina se encarga de encontrar la fila de la tecla precionada;	*
+* en caso de que no se encuentre esat subrutina se encontara en un constante 	*
+* ciclo de LOOPS hasta que encunetre que alguna tecla haya sido precionada	*
+*********************************************************************************
+
+	org	$2100
+FILA	equ	*
+
+	psha
+	pshb				;se realiza un BackUp de todos los registros que se usaran en la subrutina
+	pshx
+
+L01	ldx	#DIRMAK1		;cargo en el registro X una posicion de memoria la cual se usara como puntero para hacer operaciones con las diferentes mascaras
+	ldab	#4			;creo contador de 4 unidades cuya finalidad es usarlo para que constantemente este cargando las 4 mascaras de las filas en el puerto C y que las mismas no se repitan
+L02	ldaa	0,x			;cargo en el registro A una de las mascaras a analizar en el puerto C
+
+	staa	PORTC			;almaceno la mascaras de la una fila i para que en caso de que se encuentre precionado una tecla me devuelva un valor por el MSN de este puerto
+	nop				;se realiza una operacion nop la cual sirve para darle un tiempo al procesar a que reciba la señal de la tecla precionada
+	ldaa	PORTC			;vuelvo a cargar en el registro A lo del puerto C que en el caso de que una tecla se haya precionado esta informacion se encontrara en el MSN
+
+	anda	#MASK1			;se le realiza una mascara al registro A para que quede solo el MSN y se pueda analizar los bits de ese Nybble
+
+	cmpa	#MASK1			;se realiza una comparacion un una mascara la cual no permite a nostros daber que el registro A es $F0, en caso de que lo sea quiere decir que ninguna tecla fue precionada
+	
+	bne	L00			;en caso de que sea cero quiere decir que ninguna tecla fue precionada y se deveria de analizar el puerto con otra mascara,
+* y en caso de que sea diferente a la mascara quiere decir que una tecla fue precionada y deveriamos de analizar dicho valor en una subrutina diferente
+	
+	decb				;en caso de la comparacion entre el Registro A y $F0 haya sido cero quiere decir que ninguan tecla fue precionada y se deveria de analizar el puerto C con mascaras diferentes
+	beq	L01			;analizo si el contador es cero ya que en caso de que lo sea se deberia de volver a anlaizar todas las mascaras
+	inx				;en caso de que el contador no sea cero quiere decir que todavia faltan mascaras por recorrer
+	bra	L02			;a continuacion se vuelve a cargar el registro A pero esta vez con una mascara de la fila diferente
+
+L00	ldaa	PORTC			;en el caso de que la comparacion no sea cero, esto quiere decir que si o si alguna tecla fue precionada
+	anda	#MASK2			;mediante el uso de la mascara $0F se lorga que en los bits del registro A solo quede la infromacion de la fila de la tecla precionada
+	staa	TECFIL			;se almacena la fula de la tecla precionada en una variable local dentro de la memoria
+
+	pulx				;devuelvo los registros usados en la subrtutina para que se restauren a como estaban antes del JSR
+	pulb
+	pula	
+	
+	rts				;vuelvo al main program
+
+*****************************************************************************************
+*				SUBRUTINA COLU						*
+* Esta subrutina se encrga de encontrar la columana de la tecla precionada, el salto a	*
+* esta subrutina indica si o si la precencia de alguna tecla precionada, es por esta	*
+* razon que se omiten los contadores							*
+*****************************************************************************************
+
+	org	$2200
+COLU	equ	*
+	
+	psha				;se realiza un backup de los regsitros
+	pshy
+
+	ldy	DIRMAK2			;cargo en el registro Y un puntero en donde se guardaran las diferentes mascaras de las columnas que se usaran
+
+	ldaa	PORTC			;tomo el registro A que continene la  de la posicion de memoria indicada para uso de variable local 
+	anda	#MASK1			;le aplico una mascara al registro A para que este quede solo con los bits que me dan inforacion sobre la columna de la tecla precionada
+L04	cmpa	0,y			;comparao lo del registro A con las mascaras de las columnas que se encuentran posicionadas consecutivamente a partir del puntero Y
+	beq	L03			;anlaizo si la comparacion fue cero, en caso de que lo sea quiere decir que se lo comparo con la columna de la tecla precionada
+	
+	iny				;en caso de que la comparacion no haya sido cero se incrementa el registro y para que analice el registro A con las mascaras de columna restantes
+	bra	L04
+
+L03	ldaa	0,y			;en caso de que haya sido cero quiere decir que se lo comparo con la columna de la tecla precionada
+	staa	TECCOL			;se almacena la columna de la tecla precionada en una variable Local dentro de la memoria
+
+	puly				;se rtornana en los registros los valores anteriores
+	pula	
+
+	rts
+
+
+*************************************************************************************************
+*					SUBRUTINA MATRIZ					*
+* Esta subrutina se encarga de tomar los valores de una matriz la cual contiene los diferentes 	*
+* valores que se pueden sumar, para ello se recibe por stack los valores de la fila y la columna*
+* de la tecla precionada y con esos valores se los busca en una matriz para conocer a que valor	*
+* se refiere											*
+*************************************************************************************************
+
+	org	$2400
+MATRIZ	equ	*
+
+	pshb
+	pshx
+	pshy
+************************************************************************
+*				NUMERO DE FILA				*
+* Esta parte del programa se encarga de buscar el numero de		*
+* fila de la tecla precionada, dicho valor se encuentra comparando	*
+** se almacena en una variable local NFIL				*
+*************************************************************************
+
+	ldx	#DIRMAK1		;cargo en el registro X una posicion de memoria la cual se usara como puntero para hacer operaciones con las diferentes mascaras	
+	ldy	#DIRMAK2		;cargo en el registro Y un puntero en donde se guardaran las diferentes mascaras de las columnas que se usaran
+	clrb				;limpio lo del registro B para usarlo como contador y conocer el numero de fila de la tecla precionada
+
+	ldaa	TECFIL			;cargo en el registro A la mascara de la fila de la tecla precionada
+L06	cmpa	0,x			;comparo ese valor con las diferentes mascaras de la fila
+	
+	beq	L05			;analizo si la comparacion del registro con la mascara fue cero, en caso de que lo sea nos estaria indicando a traves del contador del registro B en numero de fila
+
+	incb				;en caso de que la comparacion no haya sido cero quiere decir quiere decir que todavia no encontro el numero de la fila precionada
+	inx				;se incrementa el registro X para que se compare la mascara de la fila con otra mascara
+	bne	L06			;branch if not = zero
+
+
+L05	stab	NFIL			;una vez que se encontro el numero de la fila precionada se guarda dicho valor en una variable local
+
+************************************************************************
+*				NUMERO DE COLUMNA			*
+* se realizan las mismas instrucciones pero esat vez para 		*
+* conocer el numero de columna de la tecla precionada.			*
+*************************************************************************
+
+	clrb				;limpio lo del registro B para usarlo como contador de columnas
+	
+	ldaa	TECCOL			;cargo en el registro A la mascara de la columna de la tecla precionada
+L08	cmpa	0,y			;comparo el registo A con las diferentes mascaras de columnas
+
+	beq	L07		;analizo si la comparacion del registro con la mascara fue cero, en caso de que lo sea nos estaria indicando a traves del contador del registro B el numero de columnas
+
+	incb				;en caso de que la comparacion no haya sido cero quiere decir quiere decir que todavia no encontro el numero de la columna precionada
+	iny				;se incrementa el registro Y para que se compare la mascara de la columna con otra mascara
+	bne	L08			;branch if not = zero
+	
+
+
+L07	stab	NCOL			;en caso de haya sido cero la comparacion quiere decir que se encontro el numero de columna y se almacena dicho valor en una variable local
+
+*********************************************************************************
+*				MATRIZ						*
+* Ahora que ya sabemos el numero de la fila y columna de la tecla precionada,	*
+* mediante operaciones aritmeticas obtenemos esos valores de una matriz		*
+* Esta subrutina me devuelve el valor de la tecla precionada por el Reg.A	*
+*********************************************************************************
+
+
+	ldx	#RAM			;cargo en el registro X la posicion de comienzo de la MATRIZ
+	ldaa	NCOL			;cargo en el registro A el numero de columna de la tecla
+	ldab	#ASIZE			;cargo en el registro B el tamaño de los elementos de la matriz
+
+	mul				;al multiplicar el Reg. A y el Reg. B consigo obtener la cantidad posiciones de memoria que esta desplazado el valor
+	abx				;al sumar dicho valor obtenido de posiciones desplazadas al registro X consigno posicionar "verticalmeente" el puntero en cuanto a valor a buscar
+
+	ldaa	NFIL			;cargo en el registro A el numero de la fila el cual se encuentra el valor a buscar
+	ldab	#FIL			;cargo en el registro B el numero de filas de la matriz
+
+	mul				;al multiplicar estos resgistros se consigue obtener el desplazamiento horizontal del valor
+	abx				;sumandolo al registro X obtenemos a nuestro puntero X posicionado sobre el valor a buscar
+
+	ldaa	0,x			;ahora que el puntero X esta posicionado en el valor a buscar, alamceno dicho valor en un registro
+
+	
+	puly
+	pulx				;devuelvo los registros utilizados
+	pulb
+
+	rts				;retorno al main program
+
+*****************************************************************************************
+*				SUBRUTINA INITDIS					*
+* Esta subrutina se encarga de inicializar correctamete el DISPLAY y el TECLADO del HC11*
+*****************************************************************************************
+
+	org	$2300
+initdis	equ	*
+	psha
+	ldaa	#$0F	;set for input/output
+	staa	DDRC	;C output
+	ldaa	PIOC	;get current value
+	anda	#$FE	;reset bit 0 to 0
+	staa	PIOC	;send it out
+	pula
+	rts
+
+*****************************************************************************************
+*				SUBRUTINA OUTCHAR					*
+* Esta subrutina se encarga de mandar al display un caracter y su respectiva posicion	*
+* dentro del display. ACCB: Posición (0-3)						*
+*****************************************************************************************
+
+outchar	equ	*
+	stab	PORTCL	;set the position 
+	staa	PORTB	;set the character
+	rts
+
+*****************************************************************************************
+*		SUBRUTINA CONVERSOR A NÚMEROS						*
+* Esta subrutina se encarga de convertir los dígitos enviados por stack a los números	*
+* para operar, devolviendolos por stack							*
+*****************************************************************************************
+
+num_obt	psha			;no se pushea al stack el AccIY ya que lo utilizaremos como FramePointer
+	pshb
+	pshx
+
+	ldaa	6,y 		;se obtiene el primer digito del primer numero, lo multiplico por 10 para dejarlo como primer digito
+	ldab	#10	
+	mul			;de esta forma se guarda en AccB y solo me falta sumarle el primer digito y obtengo el primer numero
+
+	ldaa	5,y		;se obtiene el segundo digito del primer número, y lo sumo con AccB para obtener el numero completo
+	aba
+	staa	1,y		;primer numero se guarda en el STACK
+
+	ldaa	3,y		;repito la misma operacion con el sengundo número
+	ldab	#10
+	mul
+
+	ldaa	2,y	
+	aba
+	staa	0,y		;lo guardo seguido al primer número en el stack
+
+	pulx
+	pulb
+	pula
+	rts
+
+*****************************************************************************************
+*		SUBRUTINA DE SUMA							*
+* Esta subrutina realiza la operacion de suma entre los 2 números			*
+*****************************************************************************************		
+
+sum	ldaa	1,y
+	ldab	0,y
+	aba
+	staa	LSBres
+
+	rts
+
+*****************************************************************************************
+*		SUBRUTINA DE RESTA							*
+* Esta subrutina realiza la operacion de resta entre los 2 números			*
+*****************************************************************************************
+
+res	ldaa	1,y
+	ldab	0,y
+	sba
+	bhi	posi		;en caso de que el número sea negativo, se añadirá un menos en el display
+	
+	ldaa	#$2D
+	ldab	#4
+	
+	jsr	outchar
+	
+posi	staa	LSBres
+
+	rts
+	
+*****************************************************************************************
+*		SUBRUTINA DE MULTIPLICACIÓN						*
+* Esta subrutina realiza la operacion de multiplicacion entre los 2 números		*
+*****************************************************************************************
+
+mul	ldaa	1,y
+	ldab	0,y
+	mul
+	std	MSBres
+
+	rts
+
+*****************************************************************************************
+*		SUBRUTINA DE HEXADECIMAL A BCD						*
+* Esta subrutina prepara el resultado para pasarlo por display				*
+*****************************************************************************************
+
+HexABCD	ldaa	MSBres		;se carga en AccD el resultado de la operación así se divide y se transforma en BCD.
+	ldab	LSBres		;se transforma en BCD dentro de las variables dig1, dig2, dig3,dig4 para que sea
+	ldx	#10		;más fácil pasarlo por el display.
+	idiv			;se divide por 10, y se van guardando los restos que son los digitos entero a pasar
+	stab	dig1		;por el display.
+	xgdx			;se termina de pasar el primer digito y se pasa el resultado entero al AccD
+
+	ldx	#10		;a continuación se repite el mismo proceso pero con los siguientes dígitos
+	idiv
+	stab	dig2
+	xgdx
+
+	ldx	#10
+	idiv
+	stab	dig3
+	xgdx
+
+	ldx	#10
+	idiv
+	stab	dig4
+
+	rts
+	
+*****************************************************************************************
+*		SUBRUTINA DE PASAJE AL DISPLAY						*
+*****************************************************************************************
+
+dsply	ldaa	dig1
+	ldab	#30
+	aba
+	ldab	#0
+
+	jsr	outchar
+
+	ldaa	dig2
+	ldab	#30
+	aba
+	ldab	#1
+
+	jsr	outchar
+
+	ldaa	dig3
+	ldab	#30
+	aba
+	ldab	#2
+
+	jsr	outchar
+
+	ldaa	dig4
+	ldab	#30
+	aba
+	ldab	#3
+
+	jsr	outchar
+
+	rts
+	
+
+*****************************************************************
+*			RESERVA DE MEMORIA			*
+* En este apartado del programa se reserva la memoria destinada	*
+* para el correcto funcionamiento del programa			*
+*****************************************************************
+	org	STACK		
+	rmb	30			;reservo memoria para uso del STACK
+STK_INI	equ	*-1
+
+	org	RAM
+	rmb	FIL*COL*ASIZE		;reservo memoria para uso de la MATRIZ
+
+
+
+	END
