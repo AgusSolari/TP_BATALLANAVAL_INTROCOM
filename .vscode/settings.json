@@ -1,8 +1,0 @@
-{
-    "editor.tabSize": 8,
-    "editor.renderWhitespace": "selection",
-    "files.encoding": "iso88591",
-"files.autoGuessEncoding": true,
-"editor.detectIndentation": false,
-"editor.insertSpaces": false
-}
