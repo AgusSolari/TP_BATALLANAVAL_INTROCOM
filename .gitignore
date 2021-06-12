@@ -9,4 +9,4 @@
 *.xcl
 
 # Excepciones
-!calc*.msa
+!BN*.msa
