@@ -11,3 +11,5 @@
 *.rar
 *.xcl
 
+
+!BA*.msa
