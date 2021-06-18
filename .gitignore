@@ -1,12 +1,13 @@
-# No se cargan
-*.lst
-*.bat
-*.s19
-*.r07
+# Prerequisites
+*.d
+
+# Execute
 *.msa
-*.rar
 *.exe
+*.r07
+*.bat
+*.lst
+*.s19
+*.rar
 *.xcl
 
-# Excepciones
-!BN*.msa
