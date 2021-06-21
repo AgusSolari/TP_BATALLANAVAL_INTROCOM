@@ -1,0 +1,1159 @@
+*****************************************************************************************************************
+*		TP FINAL		Batalla Naval						GRUPO 3B	*
+*														*
+* Consigna: Se pide desarrollar una batalla naval de dos jugadores utilizando la versión especial		*
+* del simulador de wookie, Wookie FX podrán encontrar dicha versión en el iol /ik.				*
+* 														*
+*****************************************************************************************************************
+
+	p68h11
+
+*****************************************************************************************
+*		DEFINICIONES DE VARIBALES Y CONSTANTES
+* Se definen las variables y constantes que se precisan para el correcto
+* funcionamiento del programa
+*****************************************************************************************
+
+DDRC	equ	$1007			;data direction register for C
+PIOC	equ	$1002			;for strobe B assertion change
+PORTCL	equ	$1005 			;port C latched
+PORTB	equ	$1004 			;port B
+PORTC	equ	$1003 			;rows
+
+ROWS	equ	PORTC 			;outputs
+COLS	equ	PORTCL 			;inputs
+
+STACK	equ	$2500
+*****************************************************************
+*			SUBRUTINA TEC Y DESTEC			*
+*****************************************************************
+FIL0	equ	00001110b		;mascaras para el manejo de filas
+FIL1	equ	00001101b
+FIL2	equ	00001011b
+FIL3	equ	00000111b
+
+COL0	equ	11100000b		;mascaras para el manejo de columnas
+COL1	equ	11010000b
+COL2	equ	10110000b
+COL3	equ	01110000b
+
+MASK1	equ	$F0
+MASK2	equ	$0F
+
+*****************************************************************
+*			SUBRUTINA MATRIZ1			*
+*****************************************************************
+DIRMAK1	equ	$3040			;comienzo de los Arrays que alamcenan las mascaras de las filas y columnas
+DIRMAK2	equ	$3030
+
+	org	$3025
+TECFIL	rmb	1			;se definen TECFIL y TECCOL como variables locales las cuales conservaran momentanemante la fila y la columna
+TECCOL	rmb	1			; de la tecla precionada
+NFIL	rmb	1
+NCOL	rmb	1
+
+	org	DIRMAK1
+	fcb	FIL0,FIL1,FIL2,FIL3	;mediante la instruccion FCB cargo de manera consecutiva las diferentes marscaras que se usaran para realizar operaciones con las FILAS
+
+	org	DIRMAK2
+	fcb	COL0,COL1,COL2,COL3	;cargo de manera consecutiva las mascaras de las columnas a partir del putero Y
+
+*****************************************************************
+*		SUBRUINA MATRIZ2				*
+*****************************************************************
+DIRMAK3	equ	$3050
+RAM	equ	$30A0
+N	equ	4			;Filas
+M	equ	4			;Columnas
+EL_SIZE	equ	1
+
+	org	DIRMAK3
+	fcb	0,1,2,$AA,3,4,5,$BB,0,1,2,$FF,3,4,5,$CC		;defino matriz con los valores del teclado
+
+*****************************************************************
+*			SUBRUINA PLAYER				*
+*****************************************************************
+P1	equ	$AA
+P2	equ	$BB
+FIRE	equ	$FF
+RST2	equ	$CC
+*****************************************************************
+*			EMBARCACIONES				*
+*****************************************************************
+FIL	equ	6
+COL	equ	6
+BITMAP	equ	$5F00
+
+SIZECAR	equ	2
+SIZESUB	equ	1
+CARGUER	equ	$80
+SUBMARI	equ	$40
+AGUA	equ	$C0
+DANADO2	equ	$C0			;esta constante es para las partes de los cargueros dañados pero no seleccionados 
+
+*****************************************************************
+*			EMBARCACIONES PLAYER 1			*
+*****************************************************************
+P1FC1	equ	1
+P1CC1	equ	1
+
+P1FC2	equ	2
+P1CC2	equ	2
+
+P1FS1	equ	3
+P1CS1	equ	3
+
+P1FS2	equ	4
+P1CS2	equ	4
+
+P1FS3	equ	5
+P1CS3	equ	5
+
+MATP1	equ	$5F40			;posicion de comienzo de la matriz de las embarcaciones del jugador 1
+
+
+
+*****************************************************************
+*			EMBARCACIONES PLAYER 2			*
+*****************************************************************
+P2FC1	equ	1
+P2CC1	equ	1
+
+P2FC2	equ	2
+P2CC2	equ	2
+
+P2FS1	equ	3
+P2CS1	equ	3
+
+P2FS2	equ	4
+P2CS2	equ	4
+
+P2FS3	equ	5
+P2CS3	equ	5
+
+MATP2	equ	$5F80			;(OJO CON POS $6000) posicion de comienzo de la matriz de las embarcaciones del jugador 2
+
+*****************************************************************
+*			VALORES PARA EL PINTADO			*
+*****************************************************************
+H2O	equ	$6
+DANADO	equ	$3D
+HUNDIDO	equ	$30
+GRIS	equ	$15
+*****************************************************************
+*			MACROS					*
+*****************************************************************
+	MACRO	%CLEAN1			;defino un macro para limpiar ciertas posiciones de memoria que se necesitan limpias luego de reiniciar la Calculadora
+	ldx	#\0
+	ldab	#\1
+L1	clr	0,x
+	inx
+	decb
+	bne	L1			;branch if not = zero
+	ENDMAC
+
+	MACRO	%CLEAN2			;defino un macro para limpiar ciertas posiciones de memoria que se necesitan limpias luego de reiniciar la Calculadora
+	ldx	#\0
+	ldab	#\1
+L2	clr	0,x
+	inx
+	decb
+	bne	L2			;branch if not = zero
+	ENDMAC
+
+	MACRO	%CLEAN3			;defino un macro para limpiar ciertas posiciones de memoria que se necesitan limpias luego de reiniciar la Calculadora
+	ldx	#\0
+	ldab	#\1
+L3	clr	0,x
+	inx
+	decb
+	bne	L3			;branch if not = zero
+	ENDMAC
+
+	MACRO	%TECLA			;esta macro sirve para obtener las tecla precionada y almacenarla en una posicion del IY
+
+	jsr	TEC
+	jsr	DELAY
+	jsr	DESTEC
+
+	bcc	GOTO			;analiza si el carry esta en 1, ya que en caso de que este quiere decir que hubo un pulso de una tecla
+
+	jsr	MATRIZ1
+	jsr	MATRIZ2
+
+	staa	0,y
+	iny
+
+	ENDMAC
+
+*****************************************************************************************
+*				MAIN PROGRAM
+* Instrucciones del main program
+*****************************************************************************************
+	org	$2000
+
+main	equ	*
+	lds	#STK_INI
+
+	%CLEAN1	MATP1,36		;limpio la matriz en donde se almacenaran las embarcaciones de los jugadores
+	%CLEAN2	MATP2,36
+
+	jsr	initdis			;inicializa display y teclado
+
+	jsr	EMBP1			;carga en matriz de memoria las embarcaciones del jugador 1
+	jsr	EMBP2			;carga en matriz de memoria las embarcaciones del jugador 2
+	jsr	COLOR
+
+
+GOTO	equ	*
+	ldy	#RAM
+	%TECLA				;la primera tecla contiene informacion del turno (si es P1 o P2)
+	jsr	PLAYER			;analiza que quien es el turno y muestra en display el jugador actual (PLAYER 1 CARRY=1   y  PLAYER 2 CARRY=0)
+
+	jsr	TRANSFE
+
+	%TECLA				;se preciona la tecla de la fila a disparar
+	jsr	clear
+	jsr	PRINFIL
+
+	%TECLA				;se preciona la tecla de la columna a disparar
+	jsr	clear
+	jsr	PRINCOL
+
+
+	%TECLA				;se preciona la tecla de disparo
+	jsr	pint
+
+	jsr	TRANSFE
+
+	%CLEAN3	RAM,5			;luego se limpia estas posiciones de memoria en donde se almacena el jugador, fila, columna y disparo para que en estas posiciones se alamcene esta informacion pero del otro jugador
+	jmp	GOTO
+
+
+
+
+*****************************************************************************************************************
+*			SUBRUTINA TECLADO						*
+* Esta subrutina contienen las subrutinas necesarias para el correcto 
+* funcionamiento del programa														*
+* SUBRUTINAS: 	1. TEC (Anlaiza que tecla se preciono)
+* 		2. DESTEC (Analiza si la tecla ya se dejo de precionar)								*
+* Rotulos Usados: REPEAT, NADA1, NADA2, NADA3, NADA4, LOOP1,LOOP2,LOOP3
+* SAVEFIL
+***********************************************************************************************
+
+*****************************************************************************************
+*				SUBRUTINA TEC						*
+* Esta subrutina se encarga de encontrar la fila y la columna de la tecla precionada;	*
+* en caso de que no se encuentre esat subrutina se encontara en un constante 		*
+* ciclo de LOOPS hasta que encunetre que alguna tecla haya sido precionada		*
+*****************************************************************************************
+
+	org	$3100
+TEC	equ	*
+
+	psha
+	pshb				;se realiza un BackUp de todos los registros que se usaran en la subrutina
+	pshx
+	pshy
+
+*************************************************************************
+*			MASCARA DE FILA 0				*
+* En este apartado se coloca la mascara de la fila 0 en el puerto C	*
+*************************************************************************
+
+REPEAT	ldaa	#FIL0			;cargo en el registro A una de las mascaras a analizar en el puerto C
+	staa	PORTC			;almaceno la mascaras de la una fila 0 en el puerto C
+
+	ldaa	PORTC			;vuelvo a cargar en el registro A lo del puerto C que en el caso de que una tecla se haya precionado esta informacion se encontrara en el MSN
+	anda	#MASK1			;se le realiza una mascara al registro A para que quede solo el MSN y se pueda analizar los bits de ese Nybble
+	cmpa	#MASK1			;al compararlo con $F0 nosotros podemos saber si se preciono una tecla o solo se investigo dicha columna
+
+	beq	LOOP1			;en el caso de que no se haya encontro una tecla precionada de esa fila se vuelve a realizar las mismas operaciones pero esta vez con diferenetes filas			
+	bra	SAVEFIL			;si es distinto el valor analizo esa fila  y salto a guardar el valor de la fila que tiene la tecla precionada
+*************************************************************************
+*			MASCARA DE FILA 1				*
+* En este apartado se coloca la mascara de la fila 1 en el puerto C	*
+*************************************************************************
+LOOP1	ldaa	#FIL1
+	staa	PORTC
+	
+	ldaa	PORTC
+	anda	#MASK1	
+	cmpa	#MASK1
+
+	beq	LOOP2
+	bra	SAVEFIL
+*************************************************************************
+*			MASCARA DE FILA 2				*
+* En este apartado se coloca la mascara de la fila 2 en el puerto C	*
+*************************************************************************
+LOOP2	ldaa	#FIL2
+	staa	PORTC
+
+	ldaa	PORTC
+	anda	#MASK1	
+	cmpa	#MASK1
+
+	beq	LOOP3
+	bra	SAVEFIL
+*************************************************************************
+*			MASCARA DE FILA 3				*
+* En este apartado se coloca la mascara de la fila 3 en el puerto C	*
+*************************************************************************
+LOOP3	ldaa	#FIL3
+	staa	PORTC
+	ldaa	PORTC
+
+	anda	#MASK1			
+	cmpa	#MASK1
+
+	beq	REPEAT			;en este caso como ya no existe otra fila consecutiva se vuelve a buscar la tecla desde la Fila 
+	bra	SAVEFIL			
+*********************************************************
+
+SAVEFIL	equ	*
+
+	staa	TECCOL			;almaceno la mascara de la columna de la tecla precionada en una variable local
+
+	ldaa	PORTC			
+	anda	#MASK2			;se le realiza una mascara al registro A para que quede solo el MSN y se pueda analizar los bits de ese Nybble
+	staa	TECFIL			;se almacena la fila de la tecla precionada en una variable local dentro de la memoria
+
+	puly
+	pulx				;devuelvo los registros usados en la subrtutina para que se restauren a como estaban antes del JSR
+	pulb
+	pula	
+	
+	rts				;vuelvo al main program
+******************************************************************************************
+*				SUBRUTINA DESTEC					*
+* Esta subrutina se encarga de analizar si la tecla se dejo de precionar		*
+*****************************************************************************************
+
+	org	$3200
+
+DESTEC	equ	*
+
+	psha
+	pshb				;se realiza un BackUp de todos los registros que se usaran en la subrutina
+	pshx
+	pshy
+*************************************************************************
+*			MASCARA DE FILA 0				*
+* En este apartado se coloca la mascara de la fila 0 en el puerto C	*
+*************************************************************************
+
+	ldaa	#FIL0			;cargo en el registro A una de las mascaras a analizar en el puerto C
+	staa	PORTC			;almaceno la mascaras de la una fila 0 en el puerto C
+
+	ldaa	PORTC			;vuelvo a cargar en el registro A lo del puerto C que en el caso de que una tecla se haya precionado esta informacion se encontrara en el MSN
+	anda	#MASK1			;se le realiza una mascara al registro A para que quede solo el MSN y se pueda analizar los bits de ese Nybble
+	cmpa	#MASK1			;al compararlo con $F0 nosotros podemos saber si se preciono una tecla o solo se investigo dicha columna
+
+	beq	LP1			;si es cero, quiere decir que no hay tecla precionada en ESTA FILA, pero no sabemos las demas
+	bra	BUSC			;si no es cero quiere decir que 
+*************************************************************************
+*			MASCARA DE FILA 1				*
+* En este apartado se coloca la mascara de la fila 1 en el puerto C	*
+*************************************************************************
+
+LP1	ldaa	#FIL1
+	staa	PORTC
+	ldaa	PORTC
+
+	anda	#MASK1	
+	cmpa	#MASK1
+
+	beq	LP2
+	bra	BUSC
+*************************************************************************
+*			MASCARA DE FILA 2				*
+* En este apartado se coloca la mascara de la fila 2 en el puerto C	*
+*************************************************************************
+
+LP2	ldaa	#FIL2
+	staa	PORTC
+	ldaa	PORTC
+
+	anda	#MASK1	
+	cmpa	#MASK1
+
+	beq	LP3
+	bra	BUSC
+*************************************************************************
+*			MASCARA DE FILA 3				*
+* En este apartado se coloca la mascara de la fila 3 en el puerto C	*
+*************************************************************************
+LP3	ldaa	#FIL3
+	staa	PORTC
+	ldaa	PORTC
+
+	anda	#MASK1			
+	cmpa	#MASK1
+
+	beq	STOP			;si se comprobo que en ninguna fila se encuentra alguna tecla precionada entonces el valor que trajo la anterior subrutina nos sirve de caso contario se vuelve a esperar a que se toque una tecla
+	bra	BUSC
+*********************************************************
+
+STOP	equ	*
+
+	sec				;si se dejo de precionar la tecla cargo el carry en 1 para usarlo como señal de validacion
+	
+BUSC	equ	*
+
+	puly
+	pulx				;devuelvo los registros usados en la subrtutina para que se restauren a como estaban antes del JSR
+	pulb
+	pula	
+	
+	rts				;vuelvo al main program
+
+*************************************************************************************************
+*					SUBRUTINA MATRIZ					*
+* Esta subrutina se encarga de tomar los valores de una matriz la cual contiene los diferentes 	*
+* valores que se pueden sumar, para ello se recibe por stack los valores de la fila y la columna*
+* de la tecla precionada y con esos valores se los busca en una matriz para conocer a que valor	*
+* se refiere											*
+*************************************************************************************************
+
+	org	$3300
+MATRIZ1	equ	*
+
+	psha
+	pshb
+	pshx				;se hace back up de los registros
+	pshy
+
+
+	ldx	#DIRMAK1		;cargo en el registro X una posicion de memoria la cual se usara como puntero de sobre las mascaras de FILA	
+	ldy	#DIRMAK2		;cargo en el registro X una posicion de memoria la cual se usara como puntero de sobre las mascaras de COLUMNA
+	clrb				;limpio lo del registro B para usarlo como contador y conocer el numero de fila de la tecla precionada
+
+	ldaa	TECFIL			;cargo en el registro A la mascara de la fila de la tecla precionada
+L06	cmpa	0,x			;comparo ese valor con las diferentes mascaras de la fila
+	
+	beq	L05			;analizo si la comparacion del registro con la mascara fue cero, en caso de que lo sea nos estaria indicando a traves del contador del registro B en numero de fila
+
+	incb				;en caso de que la comparacion no haya sido cero quiere decir quiere decir que todavia no encontro el numero de la fila precionada
+	inx				;se incrementa el registro X para que se compare la mascara de la fila con otra mascara
+	bne	L06			;branch if not = zero
+
+
+L05	stab	NFIL			;una vez que se encontro el numero de la fila precionada se guarda dicho valor en una variable local
+
+
+	clrb				;limpio lo del registro B para usarlo como contador de columnas
+	
+	ldaa	TECCOL			;cargo en el registro A la mascara de la columna de la tecla precionada
+L08	cmpa	0,y			;comparo el registo A con las diferentes mascaras de columnas
+
+	beq	L07			;analizo si la comparacion del registro con la mascara fue cero, en caso de que lo sea nos estaria indicando a traves del contador del registro B el numero de columnas
+
+	incb				;en caso de que la comparacion no haya sido cero quiere decir quiere decir que todavia no encontro el numero de la columna precionada
+	iny				;se incrementa el registro Y para que se compare la mascara de la columna con otra mascara
+	bne	L08			;branch if not = zero
+	
+
+
+L07	stab	NCOL			;en caso de haya sido cero la comparacion quiere decir que se encontro el numero de columna y se almacena dicho valor en una variable local
+
+	puly
+	pulx
+	pulb
+	pula
+
+	rts
+
+
+
+*****************************************************************************************
+*				SUBRUINA MATRIZ DE DATOS				*
+* Con esta subrutina se busca los respectivos valores de las teclas precionadas dentro	*
+* de una matriz la cual contiene estos valores						*
+*****************************************************************************************
+
+	org	$3400
+MATRIZ2	equ	*	
+
+	pshx
+	pshb
+	pshy
+
+	ldx	#DIRMAK3			;cargo en el IX el inicio de la matriz
+
+	ldaa	NCOL				;cargo la columna de la tecla precionada
+	ldab	#EL_SIZE
+	mul
+
+	abx
+
+	ldaa	NFIL				;cargo la fila de la tecla precionada
+	ldab	#EL_SIZE
+	mul
+
+	ldaa	#N
+	mul
+
+	abx
+
+	ldaa	0,x				;ahora que ya tengo el puntero X posicionada en el valor de la fila y columna, mediante esta instruccion tomo el valor
+
+	puly
+	pulb
+	pulx
+	
+	rts
+
+*****************************************************************************************
+*			SUBRUTINA PLAYER
+* Esta subrutina se encarga de analizar de quien es el turno de jugar
+* En caso de que sea turno de P1 devuelve el Carry=1 y si es el turno de P2 devuelve
+* el Carry=0
+*****************************************************************************************
+
+	org	$3600
+PLAYER	equ	*
+
+	pshx
+	psha
+	pshb
+
+	jsr	clear		;limpio el Display para luego imprimir en este el jugador
+	ldx	#RAM
+
+	ldaa	0,x		;cargo en el registro A el jugador
+	cmpa	#P1		;comparo con el primer jugador
+	bne	PL2		;si la comparacion no da cero es porque esta jugando el Player 2, de caso contrario es el turno del Player 1
+
+
+PL1	equ	*
+	ldaa	#'P'
+	ldab	#2
+	jsr	outchar
+
+	ldaa	#'1'
+	ldab	#1
+	jsr	outchar
+
+	sec			;si es turno del jugador 1 devuelve el Carry en 1
+	bra	exi
+
+PL2	equ	*
+	ldaa	#'P'
+	ldab	#2
+	jsr	outchar
+
+	ldaa	#'2'
+	ldab	#1
+	jsr	outchar
+
+
+exi	equ	*
+	pulb
+	pula
+	pulx
+	rts
+*****************************************************************************************
+*			SUBRUTINA FILA
+* Esta subrutina se encarga de imprimir en el display la fila de la posicion a disparar
+*****************************************************************************************
+PRINFIL	equ	*
+	psha
+	pshb
+	pshx
+
+	ldx	#RAM
+
+	ldaa	#'F'
+	ldab	#3
+	jsr	outchar
+
+	ldaa	#$3A			;simbolo de : (dos puntos)
+	ldab	#2
+	jsr	outchar
+
+	ldaa	1,x			;cargo en el resgitro A con la fila
+	ldab	#$31			;al sumarle 30 al la fila convierto ese numero en ASCII para poder reproducirlo en el Display
+	aba
+	ldab	#1
+	jsr	outchar
+
+	pulx
+	pulb
+	pula
+	rts
+
+*****************************************************************************************
+*			SUBRUTINA COLUMNA
+* Esta subrutina se encarga de imprimir en el display la fila de la posicion a disparar
+*****************************************************************************************
+PRINCOL	equ	*
+	psha
+	pshb	
+	pshx
+
+	ldx	#RAM
+
+	ldaa	#'C'
+	ldab	#3
+	jsr	outchar
+
+	ldaa	#$3A			;simbolo de : (dos puntos)
+	ldab	#2
+	jsr	outchar
+
+	ldaa	2,x			;cargo en el resgitro A con la fila
+	ldab	#$31			;al sumarle 30 al la fila convierto ese numero en ASCII para poder reproducirlo en el Display
+	aba
+	ldab	#1
+	jsr	outchar
+
+	pulx
+	pulb
+	pula
+
+	rts
+	
+
+
+*****************************************************************************************
+*				SUBRUTINA DE PINTADO					*
+* Esta subrutina analiza el jugador y la celda, para colorear el BITMAP.		*
+*****************************************************************************************
+	org	$3900
+pint	equ	*
+
+	psha
+	pshb
+	pshx
+	pshy
+
+	ldaa	player
+	cmpa	#P1
+	beq	pl1
+		
+	ldx	#MATP1
+	bra	pl2
+	
+pl1	ldx	#MATP2
+pl2	jsr	CelObt
+
+	tab				;Ya que se operara con el AccA, se hara un guardado del valor de la celda en AccB para no perderlo en el proceso. Ademas se utilizara luego para el pintado.
+	
+	anda	#AGUA			;A travez de una mascara
+	bne	aguant
+	ldaa	#H2O
+	bra	pintar
+	
+aguant	tba
+	anda	#AGUA
+	cmpa	#SUBMARI
+	bne	submant
+	ldaa	#HUNDIDO
+	bra	pintar
+
+submant	tba
+	anda	#DANADO2
+	bne	danont
+	ldaa	#DANADO
+
+
+
+
+danont
+
+pintar	andb	11000000b
+	aba
+	staa	0,x
+
+	puly
+	pulx
+	pulb
+	pula
+
+	rts
+
+*****************************************************************************************
+*				SUBRUTINA OBTENER CELDA					*
+* Esta subrutina utiliza como parametros la fila y la columna de la celda presionada	*
+* para devolver en el AccA el valor de la celda y en AccX la celda			*
+*****************************************************************************************
+	org	$4000
+CelObt	equ	*
+
+	pshb
+	
+	ldab	colu			; Se apunta a la columna correcta
+	abx
+	
+	ldab	row
+	ldaa	#COL
+	mul
+
+	abx				; Se apunta a la fila correcta
+	
+	ldaa	0,x
+	
+	pulb
+	rts
+
+*****************************************************************************************
+*				SUBRUTINA COLOR
+* Esta subrutina se encarga de preparar al bitmap y las matrices de los jugadores para su juego
+*****************************************************************************************
+COLOR	equ	*
+	
+	psha
+	pshb
+	pshx
+	pshy
+*********************************************************
+*		BITMAP
+*********************************************************
+	ldx	#BITMAP			;cargo en el registro X la posicion del bitmap para usarlo como puntero
+	ldab	#FIL*COL		;cargo en el AccB un contador de con la cantidad de elemnetos de la matriz
+	ldaa	#$15
+
+color1	staa	0,x
+	inx
+	decb
+	bne	color1
+	
+*********************************************************
+*		MATRIZ PLAYER1
+*********************************************************
+	
+	ldx	#MATP1			;cargo en el registro X la posicion del bitmap para usarlo como puntero
+	ldy	#FIL*COL		;cargo en el AccB un contador de con la cantidad de elemnetos de la matriz
+
+	
+color2	ldaa	#$15
+	ldab	0,x
+	aba
+	staa	0,x
+
+	inx
+	dey
+	bne	color2
+		
+*********************************************************
+*		MATRIZ PLAYER2
+*********************************************************
+
+	ldx	#MATP2			;cargo en el registro X la posicion del bitmap para usarlo como puntero
+	ldy	#FIL*COL		;cargo en el AccB un contador de con la cantidad de elemnetos de la matriz
+
+color3	ldaa	#$15
+	ldab	0,x
+	aba
+	staa	0,x
+
+	inx
+	dey
+	bne	color3
+	
+	puly
+	pulx
+	pulb
+	pula
+
+	rts
+
+*****************************************************************************************
+*			SUBRUTINA TRANSFER
+* Esta subrutina se encarga de pasar los datos de la matriz de cada jugador al bitmap
+*****************************************************************************************
+
+TRANSFE	equ	*			;si es turno del P1 cargo en el bitmap la matriz del P2
+
+	psha				
+	pshb
+	pshx
+	pshy
+
+	ldx	#MATP2			;cargo el MATP2 en el registro x
+	ldab	#36			;uso el registro B como contador
+	ldaa	#P1			;comparo P1 con RAM
+	cmpa	RAM
+
+	beq	m_p1			;si es igual a 0 significa que RAM es igual a P1, y eso significa que la matriz que hay que transferir es la del jugador dos, y si no es igual a 0, significa que la matriz que hay que transferir es la uno
+			
+	ldx	#MATP1			;si la matriz que hay que transferir es la del jugador 1, se sobreescribe el registro x
+m_p1	ldy	#BITMAP			;cargo el BITMAP en el registro Y
+
+loop	ldaa	0,x			;paso los valores del registro X al registro Y
+	staa	0,y
+	inx				;incremento los registros X e Y para pasar por toda la matriz y el bitmap
+	iny
+	decb
+	bne	loop			;si el contador llego a 0 sige el programa y sino, vuelve a "loop"
+
+	puly
+	pulx
+	pulb
+	pula
+	
+	rts
+
+
+
+
+*****************************************************************************************
+*				ENMBARCACIONES PLAYER1					*
+* Cada jugador tiene a su disposicion 2 cagueros(2 bytes) y 3 submarinos (1 byte)	*
+* Esta subrutina se encarga de colocar en una matriz las diferentes posiciones de las	*
+* embarcaciones del jugador 1								*
+*****************************************************************************************
+************************************************************************************
+	org	$3700
+EMBP1	equ	*
+
+	pshx
+	psha
+	pshb
+
+	
+*********************************************************
+*			CARGUEROS
+*********************************************************
+* Carguero 1
+	ldx	#MATP1
+
+	ldaa	#P1FC1				;Los cargueros en vez de definirlos en la matriz como de dos bytes, lo que hago es poner en posiciones consecutivas la mascara del cargero
+	ldab	#SIZESUB			; lo que pasaba antes era que estaba definido el carguero con dos bytes y los submarinos con 1 byte entonces a la hora de cargarlos en la matriz quedaban algunos superpuestos
+
+
+	mul
+	abx
+
+	ldaa	#P1CC1
+	ldab	#SIZESUB
+	mul	
+	ldaa	#COL
+	mul
+	
+	abx
+
+	ldaa	#CARGUER
+	staa	0,x
+	staa	1,x
+
+* Carguero 2
+	ldx	#MATP1
+
+	ldaa	#P1FC2
+	ldab	#SIZESUB
+
+	mul
+	abx
+
+	ldaa	#P1CC2
+	ldab	#SIZESUB
+	mul	
+	ldaa	#COL
+	mul
+	
+	abx
+
+	ldaa	#CARGUER
+	staa	0,x
+	staa	1,x
+	
+*********************************************************
+*			SUBMARINOS
+*********************************************************
+
+* Submarino 1
+	ldx	#MATP1
+
+	ldaa	#P1FS1
+	ldab	#SIZESUB
+
+	mul
+	abx
+
+	ldaa	#P1CS1
+	ldab	#SIZESUB
+	mul	
+	ldaa	#COL
+	mul
+	
+	abx
+
+	ldaa	#SUBMARI
+	staa	0,x
+
+* Submarino 2
+	ldx	#MATP1
+
+	ldaa	#P1FS2
+	ldab	#SIZESUB
+
+	mul
+	abx
+
+	ldaa	#P1CS2
+	ldab	#SIZESUB
+	mul	
+	ldaa	#COL
+	mul
+	
+	abx
+
+	ldaa	#SUBMARI
+	staa	0,x
+
+* Submarino 3
+	ldx	#MATP1
+
+	ldaa	#P1FS3
+	ldab	#SIZESUB
+
+	mul
+	abx
+
+	ldaa	#P1CS3
+	ldab	#SIZESUB
+	mul	
+	ldaa	#COL
+	mul
+	
+	abx
+
+	ldaa	#SUBMARI
+	staa	0,x
+	
+	pulb
+	pula
+	pulx
+
+	rts
+
+*****************************************************************************************
+*				ENMBARCACIONES PLAYER2					*
+* Cada jugador tiene a su disposicion 2 cagueros(2 bytes) y 3 submarinos (1 byte)	*
+*****************************************************************************************
+
+	org	$3800
+EMBP2	equ	*
+	pshx
+	psha
+	pshb
+
+*********************************************************
+*			CARGUEROS
+*********************************************************
+* Carguero 1
+	ldx	#MATP2
+
+	ldaa	#P2FC1
+	ldab	#SIZESUB
+
+	mul
+	abx
+
+	ldaa	#P2CC1
+	ldab	#SIZESUB
+	mul	
+	ldaa	#COL
+	mul
+	
+	abx
+
+	ldaa	#CARGUER
+	staa	0,x
+	staa	1,x
+
+* Carguero 2
+	ldx	#MATP2
+
+	ldaa	#P2FC2
+	ldab	#SIZESUB
+
+	mul
+	abx
+
+	ldaa	#P2CC2
+	ldab	#SIZESUB
+	mul	
+	ldaa	#COL
+	mul
+	
+	abx
+
+	ldaa	#CARGUER
+	staa	0,x
+	staa	1,x
+*********************************************************
+*			SUBMARINOS
+*********************************************************
+* Submarino 1
+	ldx	#MATP2
+
+	ldaa	#P2FS1
+	ldab	#SIZESUB
+
+	mul
+	abx
+
+	ldaa	#P2CS1
+	ldab	#SIZESUB
+	mul	
+	ldaa	#COL
+	mul
+	
+	abx
+
+	ldaa	#SUBMARI
+	staa	0,x
+
+* Submarino 2
+	ldx	#MATP2
+
+	ldaa	#P2FS2
+	ldab	#SIZESUB
+
+	mul
+	abx
+
+	ldaa	#P2CS2
+	ldab	#SIZESUB
+	mul	
+	ldaa	#COL
+	mul
+	
+	abx
+
+	ldaa	#SUBMARI
+	staa	0,x
+
+* Submarino 3
+	ldx	#MATP2
+
+	ldaa	#P2FS3
+	ldab	#SIZESUB
+
+	mul
+	abx
+
+	ldaa	#P2CS3
+	ldab	#SIZESUB
+	mul	
+	ldaa	#COL
+	mul
+	
+	abx
+
+	ldaa	#SUBMARI
+	staa	0,x
+
+	pulb
+	pula
+	pulx
+
+	rts
+
+
+
+*****************************************************************************************
+*				SUBRUTINA INITDIS					*
+* Esta subrutina se encarga de inicializar correctamete el DISPLAY y el TECLADO del HC11*
+*****************************************************************************************
+
+	org	$3500
+initdis	equ	*
+	psha
+	ldaa	#$0F	;set for input/output
+	staa	DDRC	;C output
+	ldaa	PIOC	;get current value
+	anda	#$FE	;reset bit 0 to 0
+	staa	PIOC	;send it out
+	pula
+	rts
+
+*****************************************************************************************
+*				SUBRUTINA OUTCHAR					*
+* Esta subrutina se encarga de mandar al display un caracter y su respectiva posicion	*
+* dentro del display. ACCB: Posición (0-3)						*
+*****************************************************************************************
+
+outchar	equ	*
+	stab	PORTCL	;set the position 
+	staa	PORTB	;set the character
+	rts
+
+
+*****************************************************************************************************************
+*				DELAY										*
+* Se crea un looop para hacer un delay de 0,5 s									*
+* Esta subrutina DELAY cuenta con dos LOOPS, uno interno el cual esta esta dado mediante el 			*
+* rotulo de LOOP1 y un LOOP externo el cual ejecuta este LOOP INTERNO una cierta cantidad de veces		*
+* dando lugar a un delay de 0,5 segundos									*
+*****************************************************************************************************************
+
+DELAY	equ	*		
+
+	pshx				Hago backup de los registros
+	pshy				X y Y
+
+	ldy	#15			Cargo el valor de repeticiones del Loop "Mayor"	
+GOTO2	ldx	#62497			Cargo el valor de repeticiones del loop "Interno"	
+
+GOTO1	dex				Decremento el contador
+	nop				No Operation (Suma ciclos)
+	bne	GOTO1			Salto si no es cero
+
+	dey				Decremento contador de loop 
+	bne	GOTO2			Salto a LOOP2
+	
+	puly				Reseteo los registros X y Y
+	pulx				
+	
+	rts				Regreso al programa principal
+
+*************************************************************************************************************************
+*				LIMPIEZA DEL DISPLAY									*
+* 		Esta subrutina se encarga de la limpieza del display							*
+*************************************************************************************************************************
+clear	equ	*
+
+	psha
+	pshb
+
+	ldaa	#''
+	ldab	#3			;esta subrutina se encarga de imprimir espacios en todas las posiciones del display
+	jsr	outchar			;para que este se limpie en caso de que algun caracter este impreso
+	
+	ldaa	#''
+	ldab	#2			;esta subrutina solo se ejecuta una unica vez y es depues de hacer un salto a la subrutina
+	jsr	outchar			;que va a imprimir la palabra en el display
+
+	ldaa	#''
+	ldab	#1
+	jsr	outchar
+
+	ldaa	#''
+	ldab	#0
+	jsr	outchar	
+
+	pulb
+	pula
+	
+	rts	
+*****************************************************************************************
+*		RESERVA DE MEMORIA
+* En este partado se reservan las diferentes zonas que se concideran escenciales
+*****************************************************************************************
+	org	STACK		
+	rmb	30			;reservo memoria para uso del STACK
+STK_INI	equ	*-1
+
+	org	RAM
+
+player	rmb	1
+row	rmb	1
+colu	rmb	1
+shoot	rmb	1
+
+	END
