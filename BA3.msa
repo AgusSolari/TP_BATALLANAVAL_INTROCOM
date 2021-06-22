@@ -1,8 +1,8 @@
 *****************************************************************************************************************
 *		TP FINAL		Batalla Naval						GRUPO 3B	*
 *														*
-* Consigna: Se pide desarrollar una batalla naval de dos jugadores utilizando la versi�n especial		*
-* del simulador de wookie, Wookie FX podr�n encontrar dicha versi�n en el iol /ik.				*
+* Consigna: Se pide desarrollar una batalla naval de dos jugadores utilizando la versiÃ³n especial		*
+* del simulador de wookie, Wookie FX podrÃ¡n encontrar dicha versiÃ³n en el iol /ik.				*
 * 														*
 *****************************************************************************************************************
 
@@ -24,6 +24,27 @@ ROWS	equ	PORTC 			;outputs
 COLS	equ	PORTCL 			;inputs
 
 STACK	equ	$2500
+
+Compa	equ	$30F0
+*****************************************************************
+*			STRING DE PALABRAS			*
+*****************************************************************
+HUNDIDO	equ	$42A0
+TOCADO	equ	$42B0
+
+	org	HUNDIDO
+	fcb	' '		;cargo un espacio al comienzo del string el cual sirve para conocer el inicio y fin de la palabra
+	fcc	'HUNDIDO'	;guardo el string en una posicion de memoria
+ENDSTR	equ	*		;tomo la posicion de memoria posterior al string para usarla como puntero
+	fcb	' ',0,0,0	;cargo un espacio al final del string el cual sirve para conocer el incio y fin  de la palabra, a su vez se cargan 3 ceros los cuales sirven para limpiar las posiciones siguiente a la palabra
+
+
+	org	TOCADO
+	fcb	' '		;cargo un espacio al comienzo del string el cual sirve para conocer el inicio y fin de la palabra
+	fcc	'TOCADO'	;guardo el string en una posicion de memoria
+ENDSTR	equ	*		;tomo la posicion de memoria posterior al string para usarla como puntero
+	fcb	' ',0,0,0	;cargo un espacio al final del string el cual sirve para conocer el incio y fin  de la palabra, a su vez se cargan 3 ceros los cuales sirven para limpiar las posiciones siguiente a la palabra
+
 *****************************************************************
 *			SUBRUTINA TEC Y DESTEC			*
 *****************************************************************
@@ -89,18 +110,26 @@ SIZESUB	equ	1
 CARGUER	equ	$80
 SUBMARI	equ	$40
 AGUA	equ	$C0
-DANADO2	equ	$C0			;esta constante es para las partes de los cargueros da�ados pero no seleccionados 
+DANADO	equ	$C0			;esta constante es para las partes de los cargueros daÃ±ados pero no seleccionados 
+
+NORTH	equ	1
+EAST	equ	2
+SOUTH	equ	3
+WEST	equ	4
 
 *****************************************************************
-*			EMBARCACIONES PLAYER 1			*
+*			EMBARCACIONES PLAYER 1			
 *****************************************************************
 P1FC1	equ	1
 P1CC1	equ	1
+ORP1C1	equ	NORTH			;La orientacion de los cargueros puede ser N (Norte), S (Sur), E (Este) y O (Oeste)
+
 
 P1FC2	equ	2
 P1CC2	equ	2
+ORP1C2	equ	SOUTH			
 
-P1FS1	equ	3
+P1FS1	equ	3			
 P1CS1	equ	3
 
 P1FS2	equ	4
@@ -116,9 +145,11 @@ MATP1	equ	$5F40			;posicion de comienzo de la matriz de las embarcaciones del ju
 ***************************************************************** 
 P2FC1	equ	1
 P2CC1	equ	1
+ORP2C1	equ	WEST
 
 P2FC2	equ	2
 P2CC2	equ	2
+ORP2C2	equ	EAST
 
 P2FS1	equ	3
 P2CS1	equ	3
@@ -132,11 +163,32 @@ P2CS3	equ	5
 MATP2	equ	$5F80			;(OJO CON POS $6000) posicion de comienzo de la matriz de las embarcaciones del jugador 2
 
 *****************************************************************
+*			ESTADO EMBARCACIONES P1			*	Limpiar posiciones antes de empezar el juego
+*****************************************************************
+	org	$5000
+EMBARP1	equ	*
+SUB1P1	rmb	2		;iiii jjjj	00
+SUB2P1	rmb	2
+SUB3P1	rmb	2
+CAR1P1	rmb	3
+CAR2P1	rmb	3
+
+*****************************************************************
+*			ESTADO EMBARCACIONES P2			*
+*****************************************************************
+EMBARP2	equ	*
+SUB1P2	rmb	2		;iiii jjjj	00
+SUB2P2	rmb	2
+SUB3P2	rmb	2
+CAR1P2	rmb	3
+CAR2P2	rmb	3
+
+*****************************************************************
 *			VALORES PARA EL PINTADO			*
 *****************************************************************
-H2O	equ	$6
-DANADO	equ	$3D
-HUNDIDO	equ	$30
+AZUL	equ	$6
+AMARIL	equ	$3D
+ROJO	equ	$30
 GRIS	equ	$15
 *****************************************************************
 *			MACROS					*
@@ -163,6 +215,15 @@ L2	clr	0,x
 	ldx	#\0
 	ldab	#\1
 L3	clr	0,x
+	inx
+	decb
+	bne	L3			;branch if not = zero
+	ENDMAC
+
+	MACRO	%CLEAN4			;defino un macro para limpiar ciertas posiciones de memoria que se necesitan limpias luego de reiniciar la Calculadora
+	ldx	#\0
+	ldab	#\1
+L4	clr	0,x
 	inx
 	decb
 	bne	L3			;branch if not = zero
@@ -195,9 +256,11 @@ main	equ	*
 
 	%CLEAN1	MATP1,36		;limpio la matriz en donde se almacenaran las embarcaciones de los jugadores
 	%CLEAN2	MATP2,36
+	%CLEAN3	EMBARP1,24
 
 	jsr	initdis			;inicializa display y teclado
 
+	jsr	EMBAR			;carga en una matriz las posiciones de las embarcaciones de ambos jugadores que luego a medida que transcurra el juego se iran cargando con su estado de (Hundido o Tocado)
 	jsr	EMBP1			;carga en matriz de memoria las embarcaciones del jugador 1
 	jsr	EMBP2			;carga en matriz de memoria las embarcaciones del jugador 2
 	jsr	COLOR
@@ -218,13 +281,16 @@ GOTO	equ	*
 	jsr	clear
 	jsr	PRINCOL
 
+	jsr	ESTADOD
+
+
 
 	%TECLA				;se preciona la tecla de disparo
 	jsr	pint
 
 	jsr	TRANSFE
 
-	%CLEAN3	RAM,5			;luego se limpia estas posiciones de memoria en donde se almacena el jugador, fila, columna y disparo para que en estas posiciones se alamcene esta informacion pero del otro jugador
+	%CLEAN4	RAM,5			;luego se limpia estas posiciones de memoria en donde se almacena el jugador, fila, columna y disparo para que en estas posiciones se alamcene esta informacion pero del otro jugador
 	jmp	GOTO
 
 
@@ -328,7 +394,6 @@ SAVEFIL	equ	*
 *				SUBRUTINA DESTEC					*
 * Esta subrutina se encarga de analizar si la tecla se dejo de precionar		*
 *****************************************************************************************
-
 	org	$3200
 
 DESTEC	equ	*
@@ -341,7 +406,6 @@ DESTEC	equ	*
 *			MASCARA DE FILA 0				*
 * En este apartado se coloca la mascara de la fila 0 en el puerto C	*
 *************************************************************************
-
 	ldaa	#FIL0			;cargo en el registro A una de las mascaras a analizar en el puerto C
 	staa	PORTC			;almaceno la mascaras de la una fila 0 en el puerto C
 
@@ -355,7 +419,6 @@ DESTEC	equ	*
 *			MASCARA DE FILA 1				*
 * En este apartado se coloca la mascara de la fila 1 en el puerto C	*
 *************************************************************************
-
 LP1	ldaa	#FIL1
 	staa	PORTC
 	ldaa	PORTC
@@ -369,7 +432,6 @@ LP1	ldaa	#FIL1
 *			MASCARA DE FILA 2				*
 * En este apartado se coloca la mascara de la fila 2 en el puerto C	*
 *************************************************************************
-
 LP2	ldaa	#FIL2
 	staa	PORTC
 	ldaa	PORTC
@@ -393,10 +455,9 @@ LP3	ldaa	#FIL3
 	beq	STOP			;si se comprobo que en ninguna fila se encuentra alguna tecla precionada entonces el valor que trajo la anterior subrutina nos sirve de caso contario se vuelve a esperar a que se toque una tecla
 	bra	BUSC
 *********************************************************
-
 STOP	equ	*
 
-	sec				;si se dejo de precionar la tecla cargo el carry en 1 para usarlo como se�al de validacion
+	sec				;si se dejo de precionar la tecla cargo el carry en 1 para usarlo como seÃ±al de validacion
 	
 BUSC	equ	*
 
@@ -406,7 +467,6 @@ BUSC	equ	*
 	pula	
 	
 	rts				;vuelvo al main program
-
 *************************************************************************************************
 *					SUBRUTINA MATRIZ					*
 * Esta subrutina se encarga de tomar los valores de una matriz la cual contiene los diferentes 	*
@@ -414,7 +474,6 @@ BUSC	equ	*
 * de la tecla precionada y con esos valores se los busca en una matriz para conocer a que valor	*
 * se refiere											*
 *************************************************************************************************
-
 	org	$3300
 MATRIZ1	equ	*
 
@@ -422,7 +481,6 @@ MATRIZ1	equ	*
 	pshb
 	pshx				;se hace back up de los registros
 	pshy
-
 
 	ldx	#DIRMAK1		;cargo en el registro X una posicion de memoria la cual se usara como puntero de sobre las mascaras de FILA	
 	ldy	#DIRMAK2		;cargo en el registro X una posicion de memoria la cual se usara como puntero de sobre las mascaras de COLUMNA
@@ -437,9 +495,7 @@ L06	cmpa	0,x			;comparo ese valor con las diferentes mascaras de la fila
 	inx				;se incrementa el registro X para que se compare la mascara de la fila con otra mascara
 	bne	L06			;branch if not = zero
 
-
 L05	stab	NFIL			;una vez que se encontro el numero de la fila precionada se guarda dicho valor en una variable local
-
 
 	clrb				;limpio lo del registro B para usarlo como contador de columnas
 	
@@ -451,8 +507,6 @@ L08	cmpa	0,y			;comparo el registo A con las diferentes mascaras de columnas
 	incb				;en caso de que la comparacion no haya sido cero quiere decir quiere decir que todavia no encontro el numero de la columna precionada
 	iny				;se incrementa el registro Y para que se compare la mascara de la columna con otra mascara
 	bne	L08			;branch if not = zero
-	
-
 
 L07	stab	NCOL			;en caso de haya sido cero la comparacion quiere decir que se encontro el numero de columna y se almacena dicho valor en una variable local
 
@@ -462,15 +516,11 @@ L07	stab	NCOL			;en caso de haya sido cero la comparacion quiere decir que se en
 	pula
 
 	rts
-
-
-
 *****************************************************************************************
 *				SUBRUINA MATRIZ DE DATOS				*
 * Con esta subrutina se busca los respectivos valores de las teclas precionadas dentro	*
 * de una matriz la cual contiene estos valores						*
 *****************************************************************************************
-
 	org	$3400
 MATRIZ2	equ	*	
 
@@ -502,14 +552,12 @@ MATRIZ2	equ	*
 	pulx
 	
 	rts
-
 *****************************************************************************************
 *			SUBRUTINA PLAYER
 * Esta subrutina se encarga de analizar de quien es el turno de jugar
 * En caso de que sea turno de P1 devuelve el Carry=1 y si es el turno de P2 devuelve
 * el Carry=0
 *****************************************************************************************
-
 	org	$3600
 PLAYER	equ	*
 
@@ -551,6 +599,7 @@ exi	equ	*
 	pulb
 	pula
 	pulx
+
 	rts
 *****************************************************************************************
 *			SUBRUTINA FILA
@@ -580,13 +629,14 @@ PRINFIL	equ	*
 	pulx
 	pulb
 	pula
-	rts
 
+	rts
 *****************************************************************************************
 *			SUBRUTINA COLUMNA
 * Esta subrutina se encarga de imprimir en el display la fila de la posicion a disparar
 *****************************************************************************************
 PRINCOL	equ	*
+
 	psha
 	pshb	
 	pshx
@@ -615,6 +665,7 @@ PRINCOL	equ	*
 	
 
 
+
 *****************************************************************************************
 *				SUBRUTINA DE PINTADO					*
 * Esta subrutina analiza el jugador y la celda, para colorear el BITMAP.		*
@@ -627,43 +678,51 @@ pint	equ	*
 	pshx
 	pshy
 
-	ldaa	player
-	cmpa	#P1
-	beq	pl1
-		
-	ldx	#MATP1
-	bra	pl2
-	
-pl1	ldx	#MATP2
-pl2	jsr	CelObt
+	jsr	PlObt		;se carga el puntor en la matriz del jugador correcto
+	jsr	CelObt
 
 	tab				;Ya que se operara con el AccA, se hara un guardado del valor de la celda en AccB para no perderlo en el proceso. Ademas se utilizara luego para el pintado.
 	
-	anda	#AGUA			;A travez de una mascara
+	anda	#AGUA			;A travez de una  mascara, verifico si la celda es en agua o en submarino
 	bne	aguant
-	ldaa	#H2O
+	ldaa	#AZUL
 	bra	pintar
 	
 aguant	tba
 	anda	#AGUA
 	cmpa	#SUBMARI
 	bne	submant
-	ldaa	#HUNDIDO
+	ldaa	#ROJO
+	
+
 	bra	pintar
 
 submant	tba
-	anda	#DANADO2
+	anda	#AGUA
+	cmpa	#DANADO
 	bne	danont
-	ldaa	#DANADO
-
-
+	
+	jsr	CarDan
 
 
 danont
 
-pintar	andb	11000000b
-	aba
-	staa	0,x
+pintar	andb	#11000000b		;Limpio el color previo de la casilla
+	aba				;le sumo el color correcto para que se mantenga el tipode embarcacion y su color
+	staa	0,x			;se guarda en la matriz del jugador el nuevo estado para visualizarse en display
+
+	ldy	#RAM
+	ldaa	0,y
+	cmpa	#P1
+	bne	play2
+	ldx	#EMBARP2
+	bra	play1
+
+play2	ldx	#EMBARP1
+
+play1	jsr	EmbObt
+
+	staa	1,x
 
 	puly
 	pulx
@@ -673,9 +732,52 @@ pintar	andb	11000000b
 	rts
 
 *****************************************************************************************
+*				SUBRUTINA DE PLAYER OBTAIN				*
+* Esta subrutina analiza que jugador es el que estÃ¡ ahora, devolviendo por AccIX el 	*
+* inicio de la matriz para visualizar del contrario					*
+*****************************************************************************************
+PlObt	equ	*
+	psha
+	pshb
+	pshy
+
+	ldy	#RAM
+	ldaa	0,y
+	cmpa	#P1
+	bne	pla2			;Saltara si es el jugador 2 quien esta jugando, poniendo el AccIX con el inicio de la matriz del contrario
+	ldx	#MATP2
+	bra	pla1
+	
+pla2	ldx	#MATP1
+
+pla1	puly
+	pulb
+	pula
+
+	rts
+*****************************************************************************************
+*		SUBRUTINA PLAYER OBTAIN 2						*
+* Funciona igual a PlObt pero devuelve la matriz para ver los estados de las		*
+* embarcaciones										*
+*****************************************************************************************
+PlObt2	equ	*
+	psha
+	pshb
+	phsy
+	
+	ldy	#RAM
+	ldaa	0,y
+	cmpa	#P1
+	bne	play2
+	ldx	#EMBARP2
+	bra	play1
+
+play2	ldx	#EMBARP1
+		
+*****************************************************************************************
 *				SUBRUTINA OBTENER CELDA					*
 * Esta subrutina utiliza como parametros la fila y la columna de la celda presionada	*
-* para devolver en el AccA el valor de la celda y en AccX la celda			*
+* en AccX para devolver en el AccA el valor de la celda y en AccX la celda		*
 *****************************************************************************************
 	org	$4000
 CelObt	equ	*
@@ -694,6 +796,117 @@ CelObt	equ	*
 	ldaa	0,x
 	
 	pulb
+	rts
+*****************************************************************************************
+*				SUBRUTINA EMBARCACION OBTAIN				*
+* Esta subrutina recibe por AccIX el valor del inicio de una matriz de estado de	*
+* embarcaciones y devuelve por AccIx la posicion de la celda disparada para cambiar	*
+* su estado										*
+*****************************************************************************************
+EmbObt	equ	*
+	psha
+	pshb
+	pshy
+
+	ldy	#RAM
+	ldaa	1,y
+	lsla	
+	lsla
+	lsla
+	lsla
+	ldab	2,y
+	aba				;Se guarda en AccA la fila y columna de donde se disparo
+
+nofound	cmpa	0,x
+	beq	found
+
+	inx
+	inx
+	bra	nofound
+	
+found	puly
+	pulb
+	pula
+
+	rts
+
+*****************************************************************************************
+*				SUBRUTINA CARGUERO DAÃADO				*
+* Esta subrutina se encarga de pintar de rojo la parte del carguero no seleccionada	*
+* que  ya fue disparada, una vez que se le dispara a su otra parte.			*
+*****************************************************************************************
+CarDan	equ	*
+	
+	pshy
+	pshx
+	psha
+	pshb
+
+	ldy	#RAM
+	ldaa	#P1			;verifico que jugador es
+	cmpa	0,y
+	bne	Jugad2	
+
+	ldx	#EMBARP2		;es el jugador 1 quien juega
+	bra	compar
+				
+Jugad2	ldx	#EMBARP1		;es el jugador 2 quien juega
+	
+compar	ldab	#6
+	abx				;apunta a los cargueros
+
+	ldaa	1,y
+	lsla
+	lsla	
+	lsla	
+	lsla
+	ldab	2,y
+	aba				;obtengo fila y columna de celda disparada
+	
+	cmpa	0,x
+	bne	gotod
+	ldaa	#ROJO			;encontramos la parte sin daÃ±ar en el primero
+	staa	2,x			;Cargo en la matriz para ganar que esta hundido
+			
+	
+	ldaa	#P1					
+	cmpa	0,y
+	bne	jug2
+
+	ldx	#MATP2			;Verifico de nuevo que jugador es
+	bra	goto4
+
+jug2	ldx	#MATP1
+
+goto4	jsr	CelObt
+	ldaa	#ROJO
+	ldab	0,x
+	andb	#11000000B
+	aba
+	staa	0,x			;pinto de rojo la celda disparada, ahora falta la celda que se disparo previamente
+
+	ldx	
+	bra	si
+
+gotod	cmpa	1,x
+	bne	not	
+	ldaa	#ROJO			;encontramos la parte sin daÃ±ar en el segundo
+	staa	2,x			;Cargo en la matriz para ganar que esta hundido
+
+
+	bra	si
+
+not	inx				;no encontramos el carguero
+	inx
+	inx
+
+	bra	compar
+si
+	pulb
+	pula
+	pulx
+	puly
+
 	rts
 
 *****************************************************************************************
@@ -759,6 +972,397 @@ color3	ldaa	#$15
 	rts
 
 *****************************************************************************************
+*			SUBRUTINA EMBARCACIONES						*
+* Esta subrutina se encarga de crear un arreglo en cual contiene las embarcaciones de 	*
+* los jugadores para que luego los datos de esta subrutina se usen para determinar el 	*
+* estado de las embaraciones y por ende el ganador o perdedor				*
+*****************************************************************************************
+EMBAR	equ	*
+
+	pshx
+	psha
+	pshb
+				
+	
+* Player 1
+* Submarino 1
+	ldx	#SUB1P1
+
+	ldaa	#P1FS1				P1FS1= 0000 iiii ---> x4 LSLA --> P1FS1= iiii 0000
+	lsla
+	lsla
+	lsla
+	lsla
+	
+	ldab	#P1CS1				P1CS1= 0000 jjjj
+	aba					P1FS1 + P1CS1 = iiii 0000 + 0000 jjjj = iiii jjjj
+
+	staa	0,x
+
+* Submarino 2
+	ldx	#SUB2P1
+
+
+	ldaa	#P1FS2				P1FS1= 0000 iiii ---> x4 LSLA --> P1FS1= iiii 0000
+	lsla
+	lsla
+	lsla
+	lsla
+	
+	ldab	#P1CS2				P1CS1= 0000 jjjj
+	aba					P1FS1 + P1CS1 = iiii 0000 + 0000 jjjj = iiii jjjj
+
+	staa	0,x
+
+* Submarino 3
+	ldx	#SUB3P1
+
+
+	ldaa	#P1FS3				P1FS1= 0000 iiii ---> x4 LSLA --> P1FS1= iiii 0000
+	lsla
+	lsla
+	lsla
+	lsla
+	
+	ldab	#P1CS3				P1CS1= 0000 jjjj
+	aba					P1FS1 + P1CS1 = iiii 0000 + 0000 jjjj = iiii jjjj
+
+	staa	0,x
+
+* Carguero 1
+	ldx	#CAR1P1
+
+
+	ldaa	#P1FC1				P1FS1= 0000 iiii ---> x4 LSLA --> P1FS1= iiii 0000
+	lsla
+	lsla
+	lsla
+	lsla
+	
+	ldab	#P1CC1				P1CS1= 0000 jjjj
+	aba					P1FS1 + P1CS1 = iiii 0000 + 0000 jjjj = iiii jjjj
+
+	staa	0,x
+
+* Carguero 2
+	ldx	#CAR2P1
+
+
+	ldaa	#P1FC2				P1FS1= 0000 iiii ---> x4 LSLA --> P1FS1= iiii 0000
+	lsla
+	lsla
+	lsla
+	lsla
+	
+	ldab	#P1CC2				P1CS1= 0000 jjjj
+	aba					P1FS1 + P1CS1 = iiii 0000 + 0000 jjjj = iiii jjjj
+
+	staa	0,x
+	
+* Player 2
+
+* Submarino 1
+	ldx	#SUB1P2
+
+	ldaa	#P2FS1				P1FS1= 0000 iiii ---> x4 LSLA --> P1FS1= iiii 0000
+	lsla
+	lsla
+	lsla
+	lsla
+	
+	ldab	#P2CS1				P1CS1= 0000 jjjj
+	aba					P1FS1 + P1CS1 = iiii 0000 + 0000 jjjj = iiii jjjj
+
+	staa	0,x
+
+* Submarino 2
+	ldx	#SUB2P2
+
+
+	ldaa	#P2FS2				P1FS1= 0000 iiii ---> x4 LSLA --> P1FS1= iiii 0000
+	lsla
+	lsla
+	lsla
+	lsla
+	
+	ldab	#P2CS2				P1CS1= 0000 jjjj
+	aba					P1FS1 + P1CS1 = iiii 0000 + 0000 jjjj = iiii jjjj
+
+	staa	0,x
+
+* Submarino 3
+	ldx	#SUB3P2
+
+
+	ldaa	#P2FS3				P1FS1= 0000 iiii ---> x4 LSLA --> P1FS1= iiii 0000
+	lsla
+	lsla
+	lsla
+	lsla
+	
+	ldab	#P2CS3				P1CS1= 0000 jjjj
+	aba					P1FS1 + P1CS1 = iiii 0000 + 0000 jjjj = iiii jjjj
+
+	staa	0,x
+
+* Carguero 1
+	ldx	#CAR1P2
+
+
+	ldaa	#P2FC1				P1FS1= 0000 iiii ---> x4 LSLA --> P1FS1= iiii 0000
+	lsla
+	lsla
+	lsla
+	lsla
+	
+	ldab	#P2CC1				P1CS1= 0000 jjjj
+	aba					P1FS1 + P1CS1 = iiii 0000 + 0000 jjjj = iiii jjjj
+
+	staa	0,x
+
+* Carguero 2
+	ldx	#CAR2P2
+
+
+	ldaa	#P2FC2				P1FS1= 0000 iiii ---> x4 LSLA --> P1FS1= iiii 0000
+	lsla
+	lsla
+	lsla
+	lsla
+	
+	ldab	#P2CC2				P1CS1= 0000 jjjj
+	aba					P1FS1 + P1CS1 = iiii 0000 + 0000 jjjj = iiii jjjj
+
+	staa	0,x
+
+	pulb
+	pula
+	pulx
+
+	rts
+
+
+
+*****************************************************************************************
+*			SUBRUTINA ESTADO (DISPLAY)
+* Esta subrutina se encarga de mostrar en display el si en la direccion de disparo
+* hay Agua, o un barco y si este se encuentra todaco, o hundido
+*****************************************************************************************
+
+ESTADOD	equ	$4300
+
+	psha
+	pshb
+	pshx
+	pshy
+	
+	ldx	#RAM				;toma los datos de las embarcaciones
+	ldaa	1,x				;carga en el registro A la fila disparada. AccA= 0000 iiii
+	lsla					;mueve la el nibble menos significativo 
+	lsla	
+	lsla	
+	lsla					;AccA= iiii 0000
+
+	ldab	2,x				;cargo en el registro B la columna del disparo. AccB = 00000 jjjj
+	aba					;suma los dos nibbles y los guarda en el registro A para que asÃ­ quede la fila y la columna A= iiii jjjj  (fila,columna de la tecla precionada)
+
+	ldab	0,x				;guardo si es jugador uno o dos
+	
+	cmpb	#P1
+	bne	player2
+	
+	ldx	#EMBARP2
+	ldy	#12
+
+	
+
+GOTO3	ldab	0,x				;cargo el registro B con las diferentes posiciones de las embarcaciones 
+	cba
+	beq	find1				;branch if = zero	
+	
+	inx
+	dey
+	beq	AGUA1				
+	bra	GOTO3
+
+
+
+
+
+player2	equ	*	
+	ldx	#EMBARP1
+	ldy	#12
+
+GOTO5	ldab	0,x				;cargo el registro B con las diferentes posiciones de las embarcaciones 
+	cba
+	beq	find1				;branch if = zero	
+	
+	inx
+	dey
+	beq	AGUA1				
+	bra	GOTO5
+
+
+
+
+
+find1	equ	*
+
+	ldab	1,x				;como el puntero X va a estar posicionado en el byte que contiene la fila y columna, nosotros sabemos que el siguiente byte contiene el color y por ende el estado de la embarcacion
+	cmpb	#ROJO
+	bne	TOUCH				;branch if not = zero
+
+*********************************************************
+*		HUNDIDO
+* Si el barco esta hundido muestro en el display la palabra "Hundido"
+*********************************************************
+HUNDI	equ	*	
+	jsr	clear
+
+	ldx	#HUNDIDO			;cargo el registro X con la posicion del comienzo del string
+	ldy	#10				;creo un contador de 10 unidades en el registro Y. La finalidad de este contador es utlizarlo para conocer cuando el programa dejara de imprimir caracteres en el display
+	
+	
+	clr	0,x				;se limpia la posicion la cual esta posicionada el registro X. Este cero estara ubicado a para indicar el comienzo o final de la palabra
+
+	dex					;se drcrementa el registro X para que nuestro puntero quede posicionado 3 lugares por detras
+	clr	0,x				;de la primera letra a mostrar en el diplay
+
+	dex
+	clr	0,x				;a su vez cada vez que se decrementa el valor del reg. X se va limpiando las respectivas posiciones, para evitar que se impriman caracteres que no fomran parte de la palabra
+
+	dex
+	clr	0,x
+
+	jsr	clear				;salto a la subrutinia clear la cual se encarga de limpiar los caracteres que se encuentren en el display
+
+
+GOTO6	ldaa	0,x				;cargo en el registro A el caracter que inidca el puntero X
+	ldab	#3				;cargo en la posicion 3 del display el caracter obtenido del registro A
+	jsr	outchar				;imprimo el caracter en el display
+
+	ldaa	1,x				;cargo en el registro A el caracter siguinte al que fue impreso
+	ldab	#2				;cargo en la posicion 2 del display el caracter consecutivo al impreso
+	jsr	outchar				;imprimo el caracter en el display
+
+
+	ldaa	2,x				;cargo el siguiente caracter en el registro A
+	ldab	#1				;cargo en la posicion 1 del display el caracter que fue obtenido
+	jsr	outchar				;imprimo el caracter en el display
+
+
+	ldaa	3,x				;cargo en el registro A el ultimo caracter a imprimir antes incrementar el registro X e imprimir en el display nuevos caracteres
+
+	bne	GOTO7				;analizo si es cero el ultimo caracter a imprimir. La finalidad de este dato es comprobar si  el puntero X esta llegando a su fin e ir decrementando el contador para que no imprima caracteres de mas)
+	dey					;decremento el contador IY, ya que el caracter cargado en el registro A fue un cero
+	beq	GOTO8				;en caso de que el contador sea cero quiere decir que el display ya imprimo todos los caracteres de la palabra en el display y este llega a su fin
+
+GOTO7	ldab	#0				;en caso de que el caracter no haya sido cero o el contador no finalizo, se imprime el caracter del registro A en la posicion cero del display
+
+	jsr	outchar				;se imprimer el caracter en el display
+	jsr	DELAY				;se hace un delay 
+	inx					;se incrementa el registro X para que el programa imprima en el display nuevos caracteres
+	bra	GOTO6				;se hace un salto para cargar en el display nuevos caracteres
+
+GOTO8	equ	*	
+	bra	GOTO9
+
+
+*********************************************************
+*		TOCADO
+* Si el barco fue tocado muestra en display la palabra Tocado
+*********************************************************
+TOUCH	equ	*
+
+	jsr	clear
+
+	ldx	#TOCADO			;cargo el registro X con la posicion del comienzo del string
+	ldy	#10				;creo un contador de 10 unidades en el registro Y. La finalidad de este contador es utlizarlo para conocer cuando el programa dejara de imprimir caracteres en el display
+	
+	
+	clr	0,x				;se limpia la posicion la cual esta posicionada el registro X. Este cero estara ubicado a para indicar el comienzo o final de la palabra
+
+	dex					;se drcrementa el registro X para que nuestro puntero quede posicionado 3 lugares por detras
+	clr	0,x				;de la primera letra a mostrar en el diplay
+
+	dex
+	clr	0,x				;a su vez cada vez que se decrementa el valor del reg. X se va limpiando las respectivas posiciones, para evitar que se impriman caracteres que no fomran parte de la palabra
+
+	dex
+	clr	0,x
+
+	jsr	clear				;salto a la subrutinia clear la cual se encarga de limpiar los caracteres que se encuentren en el display
+
+
+GOTOA	ldaa	0,x				;cargo en el registro A el caracter que inidca el puntero X
+	ldab	#3				;cargo en la posicion 3 del display el caracter obtenido del registro A
+	jsr	outchar				;imprimo el caracter en el display
+
+	ldaa	1,x				;cargo en el registro A el caracter siguinte al que fue impreso
+	ldab	#2				;cargo en la posicion 2 del display el caracter consecutivo al impreso
+	jsr	outchar				;imprimo el caracter en el display
+
+
+	ldaa	2,x				;cargo el siguiente caracter en el registro A
+	ldab	#1				;cargo en la posicion 1 del display el caracter que fue obtenido
+	jsr	outchar				;imprimo el caracter en el display
+
+
+	ldaa	3,x				;cargo en el registro A el ultimo caracter a imprimir antes incrementar el registro X e imprimir en el display nuevos caracteres
+
+	bne	GOTOB				;analizo si es cero el ultimo caracter a imprimir. La finalidad de este dato es comprobar si  el puntero X esta llegando a su fin e ir decrementando el contador para que no imprima caracteres de mas)
+	dey					;decremento el contador IY, ya que el caracter cargado en el registro A fue un cero
+	beq	GOTOC				;en caso de que el contador sea cero quiere decir que el display ya imprimo todos los caracteres de la palabra en el display y este llega a su fin
+
+GOTOB	ldab	#0				;en caso de que el caracter no haya sido cero o el contador no finalizo, se imprime el caracter del registro A en la posicion cero del display
+
+	jsr	outchar				;se imprimer el caracter en el display
+	jsr	DELAY				;se hace un delay 
+	inx					;se incrementa el registro X para que el programa imprima en el display nuevos caracteres
+	bra	GOTOA				;se hace un salto para cargar en el display nuevos caracteres
+
+GOTOC	equ	*	
+	bra	GOTO9
+
+*********************************************************
+*		AGUA
+* Si en la tecla precionada no se encontraba ningun barco se mostrar
+*********************************************************
+AGUA1	equ	*				;en caso de que sea agua mostrara en display la palabra "AGUA"
+
+	jsr	clear
+	
+	ldaa	'A'
+	ldab	#3
+	jsr	outchar
+
+	ldaa	'G'
+	ldab	#2
+	jsr	outchar
+
+	ldaa	'U'
+	ldab	#1
+	jsr	outchar
+
+	ldaa	'A'
+	ldab	#0
+	jsr	outchar
+	
+
+
+
+
+
+GOTO9	equ	*
+
+	puly
+	pulx
+	pulb
+	pula
+
+	rts
+
+*****************************************************************************************
 *			SUBRUTINA TRANSFER
 * Esta subrutina se encarga de pasar los datos de la matriz de cada jugador al bitmap
 *****************************************************************************************
@@ -803,14 +1407,13 @@ loop	ldaa	0,x			;paso los valores del registro X al registro Y
 * Esta subrutina se encarga de colocar en una matriz las diferentes posiciones de las	*
 * embarcaciones del jugador 1								*
 *****************************************************************************************
-************************************************************************************
+
 	org	$3700
 EMBP1	equ	*
 
 	pshx
 	psha
 	pshb
-
 	
 *********************************************************
 *			CARGUEROS
@@ -835,10 +1438,50 @@ EMBP1	equ	*
 
 	ldaa	#CARGUER
 	staa	0,x
-	staa	1,x
+
+* Analizo la orientacion del carguero 1
+	ldab	#ORP1C1				;cargo en el registro la orientacion del carguero para analizar su ubicacion
+
+	cmpb	#NORTH
+	bne	SOU1				;branch if not = zero
+	
+	xgdx					; IX-> AccD
+	subd	#FIL				; AccD - 1 FILA (6 posiciones)
+	xgdx					;  AccD ->IX
+
+	staa	0,x
+	bra	ORI1				;branch always
+
+	
+SOU1	cmpb	#SOUTH
+	bne	WES1				;branch if not = zero
+
+	xgdx					; IX-> AccD
+	addd	#FIL				; AccD + 1 FILA (6 posiciones)
+	xgdx					; AccD ->IX
+
+	staa	0,x
+	bra	ORI1				;branch always
+
+
+WES1	cmpb	#WEST
+	bne	EAS1
+
+	dex
+	staa	0,x
+	bra	ORI1
+
+
+EAS1	cmpb	#EAST
+	bne	ORI1
+
+	inx
+	staa	0,x
+	bra	ORI1
+
 
 * Carguero 2
-	ldx	#MATP1
+ORI1	ldx	#MATP1
 
 	ldaa	#P1FC2
 	ldab	#SIZESUB
@@ -856,8 +1499,49 @@ EMBP1	equ	*
 
 	ldaa	#CARGUER
 	staa	0,x
-	staa	1,x
+
+* Analizo la orientacion del carguero 2
+	ldab	#ORP1C2				;cargo en el registro la orientacion del carguero para analizar su ubicacion
+
+	cmpb	#NORTH
+	bne	SOU2				;branch if not = zero
 	
+	xgdx					; IX-> AccD
+	subd	#FIL				; AccD - 1 FILA (6 posiciones)
+	xgdx					;  AccD ->IX
+
+	staa	0,x
+	bra	ORI2				;branch always
+
+	
+SOU2	cmpb	#SOUTH
+	bne	WES2				;branch if not = zero
+
+	xgdx					; IX-> AccD
+	addd	#FIL				; AccD + 1 FILA (6 posiciones)
+	xgdx					; AccD ->IX
+
+	staa	0,x
+	bra	ORI2				;branch always
+
+
+WE2S	cmpb	#WEST
+	bne	EAS2
+
+	dex
+	staa	0,x
+	bra	ORI2
+
+
+EAS2	cmpb	#EAST
+	bne	ORI2
+
+	inx
+	staa	0,x
+	bra	ORI2
+
+
+ORI2	equ	*	
 *********************************************************
 *			SUBMARINOS
 *********************************************************
@@ -961,7 +1645,48 @@ EMBP2	equ	*
 
 	ldaa	#CARGUER
 	staa	0,x
-	staa	1,x
+	
+* Analizo la orientacion del carguero 1 (player 2)
+	ldab	#ORP2C1				;cargo en el registro la orientacion del carguero para analizar su ubicacion
+
+	cmpb	#NORTH
+	bne	SOU3				;branch if not = zero
+	
+	xgdx					; IX-> AccD
+	subd	#FIL				; AccD - 1 FILA (6 posiciones)
+	xgdx					;  AccD ->IX
+
+	staa	0,x
+	bra	ORI3				;branch always
+
+	
+SOU3	cmpb	#SOUTH
+	bne	WES3				;branch if not = zero
+
+	xgdx					; IX-> AccD
+	addd	#FIL				; AccD + 1 FILA (6 posiciones)
+	xgdx					; AccD ->IX
+
+	staa	0,x
+	bra	ORI3				;branch always
+
+
+WES3	cmpb	#WEST
+	bne	EAS3
+
+	dex
+	staa	0,x
+	bra	ORI3
+
+
+EAS3	cmpb	#EAST
+	bne	ORI3
+
+	inx
+	staa	0,x
+	bra	ORI3
+
+ORI3	equ	*
 
 * Carguero 2
 	ldx	#MATP2
@@ -982,7 +1707,48 @@ EMBP2	equ	*
 
 	ldaa	#CARGUER
 	staa	0,x
-	staa	1,x
+* Analizo la orientacion del carguero 2 (player 2)
+	
+	ldab	#ORP2C2				;cargo en el registro la orientacion del carguero para analizar su ubicacion
+
+	cmpb	#NORTH
+	bne	SOU4				;branch if not = zero
+	
+	xgdx					; IX-> AccD
+	subd	#FIL				; AccD - 1 FILA (6 posiciones)
+	xgdx					;  AccD ->IX
+
+	staa	0,x
+	bra	ORI4				;branch always
+
+	
+SOU4	cmpb	#SOUTH
+	bne	WES4				;branch if not = zero
+
+	xgdx					; IX-> AccD
+	addd	#FIL				; AccD + 1 FILA (6 posiciones)
+	xgdx					; AccD ->IX
+
+	staa	0,x
+	bra	ORI4				;branch always
+
+
+WES4	cmpb	#WEST
+	bne	EAS4
+
+	dex
+	staa	0,x
+	bra	ORI4
+
+
+EAS4	cmpb	#EAST
+	bne	ORI4
+
+	inx
+	staa	0,x
+	bra	ORI4
+
+ORI4	equ	*
 *********************************************************
 *			SUBMARINOS
 *********************************************************
@@ -1073,7 +1839,7 @@ initdis	equ	*
 *****************************************************************************************
 *				SUBRUTINA OUTCHAR					*
 * Esta subrutina se encarga de mandar al display un caracter y su respectiva posicion	*
-* dentro del display. ACCB: Posici�n (0-3)						*
+* dentro del display. ACCB: PosiciÃ³n (0-3)						*
 *****************************************************************************************
 
 outchar	equ	*
