@@ -13,7 +13,7 @@
 * Se definen las variables y constantes que se precisan para el correcto
 * funcionamiento del programa
 *****************************************************************************************
-
+end	bra 	end			;Este es el fi
 *****************************************************************
 *			EMBARCACIONES PLAYER 1			*
 *****************************************************************
@@ -274,7 +274,11 @@ L5	clr	0,x
 
 main	equ	*
 	lds	#STK_INI
-
+*****************************************************************
+*		INICIALIZACION DEL JUEGO			*
+* Se ejecutan diferentes subrutinas y macro cuya finalidad	*
+* es preparar todo para iniciar una partida			*
+*****************************************************************
 	%CLEAN1	MATP1,36		;limpio las matrices en donde se almacenaran las embarcaciones de los jugadores y sus estados
 	%CLEAN2	MATP2,36
 	%CLEAN3	EMBARP1,24
@@ -295,9 +299,9 @@ GOTO	equ	*
 	cmpa	#$CC			;analizo si la tecla precionada es la de RESET
 OUTRANG	beq	main			;en caso de precionarse la tecla de RESET el juego se reiniciara
 
-	jsr	PLAYER			;analiza que quien es el turno y muestra en display el jugador actual (PLAYER 1 CARRY=1   y  PLAYER 2 CARRY=0)
-	jsr	TRANSFE
-	jsr	sub_err
+	jsr	PLAYER			;analiza de quien es el turno y muestra en display el jugador actual (PLAYER 1 CARRY=1   y  PLAYER 2 CARRY=0)
+	jsr	TRANSFE			;analiza de quien es el turno y transfiere la matriz del jugador contrario al bitmap
+	jsr	sub_err			;subrutina error la cual analiza si la primera tecla fue un turno o un numero
 
 	bcc	sigue2			;branch if carry clear (C=0)
 
@@ -711,7 +715,7 @@ exi	equ	*
 
 	rts
 *****************************************************************************************
-*				UBRUTINA FILA						*
+*				SUBRUTINA FILA						*
 * Esta subrutina se encarga de imprimir en el display la fila de la posicion a disparar	*
 *****************************************************************************************
 PRINFIL	equ	*
@@ -1001,7 +1005,7 @@ win	equ	*
 	pshy
 	pshx
 	
-	jsr	PlObt2
+	jsr	PlObt2			;apunta el puntero IX al estado de la embarcacion
 	
 	ldaa	#ROJO
 	ldab	#3			;defino un contador para la cantidad de submarinos
@@ -1161,7 +1165,7 @@ REP5	equ	*
 * Esta subrutina se encarga de mostrar en display "Insert Player Again" en caso de que
 * no se haya seleccionado algun jugador antes de precionar la fila y columna
 *****************************************************************************************
-INSP1P2	equ	*				;en caso de que sea agua mostrara en display la palabra "Insert Player Again"
+INSP1P2	equ	*		
 
 	pshx
 	psha
