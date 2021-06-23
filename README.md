@@ -22,8 +22,8 @@ Luego de terminar el turno del Primer jugador se debera de precionar la tecla de
 
 # Aclaraciones
 ***
-A continuacion se aclaran diferentes situaciones a tener en
-**Ganador:** Una vez que el jugador contrario se quede sin embarcaciones en pie, se mostrara en display una frase celebrando la victoria del jugador ganador
+A continuacion se aclaran diferentes situaciones a tener en cuenta:
+1. **Ganador:** Una vez que el jugador contrario se quede sin embarcaciones en pie, se mostrara en display una frase celebrando la victoria del jugador ganador
 
 > Una vez que hubo algun ganador se debera de precionar la tecla RESET en el teclado para iniciar un nuevo juego.
 
