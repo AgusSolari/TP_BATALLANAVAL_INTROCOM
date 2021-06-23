@@ -245,6 +245,15 @@ L4	clr	0,x
 	bne	L4			;branch if not = zero
 	ENDMAC
 
+	MACRO	%CLEAN5			;defino un macro para limpiar ciertas posiciones de memoria que se necesitan limpias para el correcto funcionamiento
+	ldx	#\0
+	ldab	#\1
+L5	clr	0,x
+	inx
+	decb
+	bne	L5			;branch if not = zero
+	ENDMAC
+
 	MACRO	%TECLA			;esta macro sirve para obtener las tecla precionada y almacenarla en una posicion del IY
 	jsr	TEC
 	jsr	DELAY
@@ -270,6 +279,7 @@ main	equ	*
 	%CLEAN1	MATP1,36		;limpio las matrices en donde se almacenaran las embarcaciones de los jugadores y sus estados
 	%CLEAN2	MATP2,36
 	%CLEAN3	EMBARP1,24
+	%CLEAN4	RAM,5
 
 	jsr	initdis			;inicializa display y teclado
 
@@ -279,7 +289,7 @@ main	equ	*
 	jsr	EMBP1			;carga en matriz de memoria las embarcaciones del jugador 1
 	jsr	EMBP2			;carga en matriz de memoria las embarcaciones del jugador 2
 	jsr	COLOR
-	jsr	clear			;antes de empezar la jugada limpia el display
+REP6	jsr	clear			;antes de empezar la jugada limpia el display
 
 
 GOTO	equ	*
@@ -297,28 +307,52 @@ GOTO	equ	*
 	jsr	clear			;limpio el display
 	jsr	PRINCOL			;imprimo en el display la columna precionada
 
-
-
 	%TECLA				;se preciona la tecla de disparo
+
+	jsr	corrob
+	bcs	REP6
+	
 	jsr	pint
 	jsr	TRANSFE
 	jsr	ESTADOD			;muestra en display si en la tecla disparada 
 
-	jsr	corrob
-
-	%CLEAN4	RAM,5			;luego se limpia estas posiciones de memoria en donde se almacena el jugador, fila, columna y disparo para que en estas posiciones se alamcene esta informacion pero del otro jugador
 	
 	jsr	win	
 	bcs	REP2			;si luego de la subrutina Win el carry esta en 1 quiere decir que hubo algun ganador y se debe de preparar al programa para un nuevo juego. De caso contrario se sigue la partida
+	
+	%CLEAN5	RAM,5			;luego se limpia estas posiciones de memoria en donde se almacena el jugador, fila, columna y disparo para que en estas posiciones se alamcene esta informacion pero del otro jugador
 	jmp	GOTO
 
 REP2	jmp	main
 
 *****************************************************************************************
 *			SUBRUTINA CORROBORAR						*
-* Esta subrutina corrobora que no se haya presionado ya la celda seleccionada		*
+* Esta subrutina corrobora si la tecla presionada, ya fue presionada			*
 *****************************************************************************************
+corrob	equ	*
+	pshx
+	pshy
+	psha
+	pshb
 
+	jsr	PlObt
+	jsr	CelObt
+
+	anda	#00111111b		
+	ldab	#GRIS
+	cba
+	beq	presion			;Saltará si la tecla no se presiono, si ya se presiono se pondra el carry en 1, para postariormente evitar operaciones innecesarias
+	sec
+	bra	nopress
+
+presion	clc
+	
+nopress	pulb
+	pula
+	puly
+	pulx
+
+	rts
 *****************************************************************************************
 *			SUBRUTINA TECLADO						*
 * Esta subrutina contienen las subrutinas necesarias para el correcto 
@@ -622,7 +656,7 @@ exi	equ	*
 
 	rts
 *****************************************************************************************
-*				SUBRUTINA FILA						*
+*				UBRUTINA FILA						*
 * Esta subrutina se encarga de imprimir en el display la fila de la posicion a disparar	*
 *****************************************************************************************
 PRINFIL	equ	*
@@ -910,8 +944,8 @@ win	equ	*
 	pshb
 	pshy
 	pshx
-
-	jsr	PlObt2			;posiciono al puntero IX en el comienzo de la matriz de los estados
+	
+	jsr	PlObt2
 	
 	ldaa	#ROJO
 	ldab	#3			;defino un contador para la cantidad de submarinos
@@ -937,14 +971,15 @@ salto2	cmpa	2,x
 	beq	winner			;Encontró el ganador ya que se analizaron los 2 cargueros
 	bra	salto2
 
-	jsr	windsp
-winner	jsr	Rstwait
+winner	jsr	windsp
+	jsr	Rstwait
 	jsr	clear
 
 	sec				;en caso de que se obtuvo algun ganador pongo el carry en 1 para indicar al programa que ya no se debe ejecutar mas y preparo al juego para iniciarlo nuevamente
-
+	bra	winn
+	
 nowin	clc				;pone el carry en cero si no hubo algun ganador
-	pulx
+winn	pulx
 	puly
 	pulb
 	pula
@@ -1101,7 +1136,6 @@ hundir	equ	*
 	aby					;de esta forma tengo en AccY lo que le debo sumar a AccIX para dejarlo en la siguiente celda
 
 	jsr	PlObt
-	jsr	CelObt
 	
 	xgdy					;dejo en el AccB lo que le debo sumar a AccX para que se quede en la celda de la otra parte del carguero
 	abx
@@ -1128,7 +1162,6 @@ segun	ldaa	#ROJO				;En el caso del salto, es que la disparada fue la segunda pa
 	aby					;de esta forma tengo en AccY lo que le debo sumar a AccIX para dejarlo en la siguiente celda
 
 	jsr	PlObt
-	jsr	CelObt
 	
 	xgdy					;dejo en el AccB lo que le debo sumar a AccX para que se quede en la celda de la otra parte del carguero
 	abx
