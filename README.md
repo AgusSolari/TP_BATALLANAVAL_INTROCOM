@@ -15,25 +15,20 @@ Para su utilizacion el usuario una vez que tiene en sus manos el codigo debera d
 * Submarino: (1 posicion)
 * Carguero: (2 posiciones) con orientacion NORTH, SOUTH, WEST y EAST
 
-Una vez que ya haya cargado el codigo en el correspondiente Software le debera de dar Inicio al codigo. Una vez inicializado despliega el de los menus el "Puerto C" el cual contiene un teclado matricial de 16 teclas en el cual se precionara el jugador actual, luego se elegira una fila y columna disparar y por ultimo se precionara la tecla de disparo. 
-
-Estas operacion se veran reflejadas en tiempo real en el display que muestra la palabra de "HUNDIDO" en el caso de que se hundio la embarcacion, "TOCADO" en el caso de que el disparo fue a una de las parte del carguero (pero no lo derribo) y por utlimo "AGUA" si en la coordenada disparada no se encontraba ninguna embarcacion.
-A su vez se indicara en el Bitmap la posicion diparada y mediante el color ROJO si la embarcacion esta "hundida", AMARILLO si la embarcacion esta "tocada" y por ultimo "AZUL" si en la coordenada disparada no existe embarcacion
+Una vez que ya haya cargado el codigo en el correspondiente Software le debera de dar Inicio al codigo. Una vez inicializado despliega el de los menus el "Puerto C" el cual contiene un teclado matricial de 16 teclas en el cual se precionara el jugador actual, luego se elegira una fila y columna disparar y por ultimo se precionara la tecla de disparo. Estas operacion se ven reflejadas en tiempo real en el display que muestra la palabra de "HUNDIDO" en el caso de que se hundio la embarcacion, "TOCADO" en el caso de que el disparo fue a una de las parte del carguero (pero no lo derribo) y por utlimo "AGUA" si en la coordenada disparada no se encontraba ninguna embarcacion.
 
 Luego de terminar el turno del Primer jugador se debera de precionar la tecla de "P2" y repetir la misma secuencia
 
 
 # Aclaraciones
 ***
-A continuacion se aclaran diferentes situaciones a tener en cuenta
-1. En caso de haberse equivocado con el turno (es decir precionar P1 en vez de P2), el programa permite corregir el turno siempre y cuando no se haya precionado algun numero de por medio.
-2. Una vez empezada la partida, en caso de que se la quiera reiniciar solo se debera de precionar la tecla RESET para comenzar una nueva partida
-3. **Ganador:** Una vez que el jugador contrario se quede sin embarcaciones en pie, se mostrara en display una frase celebrando la victoria del jugador ganador y en el bitmap un trofeo.
+A continuacion se aclaran diferentes situaciones a tener en cuenta:
+1. **Ganador:** Una vez que el jugador contrario se quede sin embarcaciones en pie, se mostrara en display una frase celebrando la victoria del jugador ganador
 
-> En caso de que halla habido algun ganador se debera de precionar la tecla RESET en el teclado para iniciar un nuevo juego.
+> Una vez que hubo algun ganador se debera de precionar la tecla RESET en el teclado para iniciar un nuevo juego.
 
 
 # Recomendaciones
 ***
-A continuacion se detallan acciones que se recomiendan llevar a cabo para un correcto funcionamiento del juego
+A continuacion se detallan acciones que se recomiendan llevar a cabo para un correcto funcionamiento de la Calculadora.
 1. Se recomienda no apretar demasiado rapido los digitos del teclado.
