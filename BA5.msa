@@ -29,8 +29,12 @@ Compa	equ	$30F0
 *****************************************************************
 *			STRING DE PALABRAS			*
 *****************************************************************
-HUNDIDO	equ	$42A0
-TOCADO	equ	$42B0
+HUNDIDO	equ	$3E00
+TOCADO	equ	$3E50
+AGUASTR	equ	$3D80
+P1WIN	equ	$3D00
+P2WIN	equ	$3D40
+
 
 	org	HUNDIDO
 	fcb	' '		;cargo un espacio al comienzo del string el cual sirve para conocer el inicio y fin de la palabra
@@ -44,6 +48,27 @@ ENDSTR1	equ	*		;tomo la posicion de memoria posterior al string para usarla como
 	fcc	'TOCADO'	;guardo el string en una posicion de memoria
 ENDSTR2	equ	*		;tomo la posicion de memoria posterior al string para usarla como puntero
 	fcb	' ',0,0,0	;cargo un espacio al final del string el cual sirve para conocer el incio y fin  de la palabra, a su vez se cargan 3 ceros los cuales sirven para limpiar las posiciones siguiente a la palabra
+
+
+	org	AGUASTR
+	fcb	' '		;cargo un espacio al comienzo del string el cual sirve para conocer el inicio y fin de la palabra
+	fcc	'AGUA'	;guardo el string en una posicion de memoria
+ENDSTR3	equ	*		;tomo la posicion de memoria posterior al string para usarla como puntero
+	fcb	' ',0,0,0	;cargo un espacio al final del string el cual sirve para conocer el incio y fin  de la palabra, a su vez se cargan 3 ceros los cuales sirven para limpiar las posiciones siguiente a la palabra
+
+
+	org	P1WIN
+	fcb	' '
+	fcc	'GANO EL JUGADOR 1'
+ENDSTR4	equ	*
+	fcb	' ',0,0,0
+
+
+	org	P2WIN
+	fcb	' '
+	fcc	'GANO EL JUGADOR 2'
+ENDSTR5	equ	*
+	fcb	' ',0,0,0
 
 *****************************************************************
 *			SUBRUTINA TEC Y DESTEC			*
@@ -92,7 +117,7 @@ EL_SIZE	equ	1
 	fcb	0,1,2,$AA,3,4,5,$BB,0,1,2,$FF,3,4,5,$CC		;defino matriz con los valores del teclado
 
 *****************************************************************
-*			SUBRUINA PLAYER				*
+*			SUBRUTINA PLAYER			*
 *****************************************************************
 P1	equ	$AA
 P2	equ	$BB
@@ -110,7 +135,7 @@ SIZESUB	equ	1
 CARGUER	equ	$80
 SUBMARI	equ	$40
 AGUA	equ	$C0
-DANADO	equ	$C0			;esta constante es para las partes de los cargueros daÃƒÂ±ados pero no seleccionados 
+DANADO	equ	$C0			;esta constante es para las partes de los cargueros danados pero no seleccionados 
 
 NORTH	equ	1
 EAST	equ	2
@@ -193,7 +218,7 @@ GRIS	equ	$15
 *****************************************************************
 *			MACROS					*
 *****************************************************************
-	MACRO	%CLEAN1			;defino un macro para limpiar ciertas posiciones de memoria que se necesitan limpias luego de reiniciar la Calculadora
+	MACRO	%CLEAN1			;defino un macro para limpiar ciertas posiciones de memoria que se necesitan limpias para el correcto funcionamiento
 	ldx	#\0
 	ldab	#\1
 L1	clr	0,x
@@ -202,7 +227,7 @@ L1	clr	0,x
 	bne	L1			;branch if not = zero
 	ENDMAC
 
-	MACRO	%CLEAN2			;defino un macro para limpiar ciertas posiciones de memoria que se necesitan limpias luego de reiniciar la Calculadora
+	MACRO	%CLEAN2			;defino un macro para limpiar ciertas posiciones de memoria que se necesitan limpias para el correcto funcionamiento
 	ldx	#\0
 	ldab	#\1
 L2	clr	0,x
@@ -211,7 +236,7 @@ L2	clr	0,x
 	bne	L2			;branch if not = zero
 	ENDMAC
 
-	MACRO	%CLEAN3			;defino un macro para limpiar ciertas posiciones de memoria que se necesitan limpias luego de reiniciar la Calculadora
+	MACRO	%CLEAN3			;defino un macro para limpiar ciertas posiciones de memoria que se necesitan limpias para el correcto funcionamiento
 	ldx	#\0
 	ldab	#\1
 L3	clr	0,x
@@ -220,7 +245,7 @@ L3	clr	0,x
 	bne	L3			;branch if not = zero
 	ENDMAC
 
-	MACRO	%CLEAN4			;defino un macro para limpiar ciertas posiciones de memoria que se necesitan limpias luego de reiniciar la Calculadora
+	MACRO	%CLEAN4			;defino un macro para limpiar ciertas posiciones de memoria que se necesitan limpias para el correcto funcionamiento
 	ldx	#\0
 	ldab	#\1
 L4	clr	0,x
@@ -254,16 +279,19 @@ L4	clr	0,x
 main	equ	*
 	lds	#STK_INI
 
-	%CLEAN1	MATP1,36		;limpio la matriz en donde se almacenaran las embarcaciones de los jugadores
+	%CLEAN1	MATP1,36		;limpio las matrices en donde se almacenaran las embarcaciones de los jugadores y sus estados
 	%CLEAN2	MATP2,36
 	%CLEAN3	EMBARP1,24
 
 	jsr	initdis			;inicializa display y teclado
 
+	jsr	lleno			;sirve para cargar en los estados de los barcos un valor diferente a cero (SOLO SE EJECUTA UNA UNICA VEZ AL COMIENZO DEL PROGRAMA)
+
 	jsr	EMBAR			;carga en una matriz las posiciones de las embarcaciones de ambos jugadores que luego a medida que transcurra el juego se iran cargando con su estado de (Hundido o Tocado)
 	jsr	EMBP1			;carga en matriz de memoria las embarcaciones del jugador 1
 	jsr	EMBP2			;carga en matriz de memoria las embarcaciones del jugador 2
 	jsr	COLOR
+	jsr	clear			;antes de empezar la jugada limpia el display
 
 
 GOTO	equ	*
@@ -274,12 +302,12 @@ GOTO	equ	*
 	jsr	TRANSFE
 
 	%TECLA				;se preciona la tecla de la fila a disparar
-	jsr	clear
-	jsr	PRINFIL
+	jsr	clear			;limpio el display
+	jsr	PRINFIL			;imprimo en el display la fila precionada
 
 	%TECLA				;se preciona la tecla de la columna a disparar
-	jsr	clear
-	jsr	PRINCOL
+	jsr	clear			;limpio el display
+	jsr	PRINCOL			;imprimo en el display la columna precionada
 
 
 
@@ -287,19 +315,26 @@ GOTO	equ	*
 	%TECLA				;se preciona la tecla de disparo
 	jsr	pint
 	jsr	TRANSFE
-	jsr	ESTADOD
-
+	jsr	ESTADOD			;muestra en display si en la tecla disparada 
 
 	%CLEAN4	RAM,5			;luego se limpia estas posiciones de memoria en donde se almacena el jugador, fila, columna y disparo para que en estas posiciones se alamcene esta informacion pero del otro jugador
+	
+	jsr	win	
+	
+	bcs	REP2			;si luego de la subrutina Win el carry esta en 1 quiere decir que hubo algun ganador y se debe de preparar al programa para un nuevo juego. De caso contrario se sigue la partida
+	
 	jmp	GOTO
 
+REP2	jmp	main
 
 
 
-*****************************************************************************************************************
+
+
+*****************************************************************************************
 *			SUBRUTINA TECLADO						*
 * Esta subrutina contienen las subrutinas necesarias para el correcto 
-* funcionamiento del programa														*
+* funcionamiento del programa								*
 * SUBRUTINAS: 	1. TEC (Anlaiza que tecla se preciono)
 * 		2. DESTEC (Analiza si la tecla ya se dejo de precionar)								*
 * Rotulos Usados: REPEAT, NADA1, NADA2, NADA3, NADA4, LOOP1,LOOP2,LOOP3
@@ -308,8 +343,8 @@ GOTO	equ	*
 
 *****************************************************************************************
 *				SUBRUTINA TEC						*
-* Esta subrutina se encarga de encontrar la fila y la columna de la tecla precionada;	*
-* en caso de que no se encuentre esat subrutina se encontara en un constante 		*
+* Esta subrutina se encarga de encontrar la fila y la columna de la tecla precionada,	*
+* en caso de que no se encuentre esta subrutina se encontara en un constante 		*
 * ciclo de LOOPS hasta que encunetre que alguna tecla haya sido precionada		*
 *****************************************************************************************
 
@@ -663,9 +698,6 @@ PRINCOL	equ	*
 
 	rts
 	
-
-
-
 *****************************************************************************************
 *				SUBRUTINA DE PINTADO					*
 * Esta subrutina analiza el jugador y la celda, para colorear el BITMAP.		*
@@ -678,7 +710,7 @@ pint	equ	*
 	pshx
 	pshy
 
-	jsr	PlObt		;se carga el puntor en la matriz del jugador correcto
+	jsr	PlObt			;se carga el puntor en la matriz del jugador correcto
 	jsr	CelObt
 
 	tab				;Ya que se operara con el AccA, se hara un guardado del valor de la celda en AccB para no perderlo en el proceso. Ademas se utilizara luego para el pintado.
@@ -689,40 +721,68 @@ pint	equ	*
 	bra	pintar
 	
 aguant	tba
-	anda	#AGUA
+	anda	#AGUA			;Filtro el valor de la casilla para que verifique el tipo de embarcacion
 	cmpa	#SUBMARI
-	bne	submant
-	ldaa	#ROJO
-	
-
-	bra	pintar
-
-* REVISAR ACA QUE NO TOMA CUANDO
-submant	tba
-	anda	#AGUA
-	cmpa	#DANADO
 	bne	danont
 	
-	jsr	CarDan
+	jsr	SubHun			;En caso de que en la fila y columna disparada se encuentre un submarino se colocara en el bitmap el color rojo y se cargara su respectivo estado en la matriz
 
+	ldaa	#ROJO
+	bra	pintar
 
-danont
+danont	ldaa	#DANADO			;si no esta dañado y tampoco es un submarino o agua, entonces es un carguero (y por ende habria que dañarlo y poner el color amarillo)
+	ldab	#AMARIL
+	aba
+	staa	0,x			;cargo en la matriz del jugador el estado del barco
+
+* Ahora almaceno el estado en una matriz de las embarcaciones de cada jugador
+	jsr	PlObt2			;esta subrutina me devuelve en IX un puntero posicionado en el comienzo de la matriz de las embaraciones de cada jugador
+	jsr	EmbObt			;esta subrutina me posiciona el puntero IX la posicion de la celda disparada
+
+	ldaa	#2			;contador de dos para analizar en donde poner el esatdo de los cargueros
+
+volve	ldaa	1,x
+	cmpa	#$FF
+
+	beq	alma
+
+	inx
+	decb
+	beq	toca
+	bra	volve
+
+alma	ldab	#AMARIL
+	stab	1,x			;cargo en la matriz de la embarcaciones el estado del carguero
+	bra	toca
+
 
 pintar	andb	#11000000b		;Limpio el color previo de la casilla
 	aba				;le sumo el color correcto para que se mantenga el tipode embarcacion y su color
 	staa	0,x			;se guarda en la matriz del jugador el nuevo estado para visualizarse en display
 
-	ldy	#RAM
-	ldaa	0,y
-	cmpa	#P1
-	bne	play2
-	ldx	#EMBARP2
-	bra	play1
 
-play2	ldx	#EMBARP1
+toca	puly
+	pulx
+	pulb
+	pula
 
-play1	jsr	EmbObt
+	rts
 
+*****************************************************************************************
+*				SUBRUTINA SUBMARINO HUNDIDO				*
+* Esta subrutina pone en hundido el estado del submarino				*
+*****************************************************************************************
+SubHun	equ	*
+
+	psha
+	pshb
+	pshx
+	pshy
+
+	jsr	PlObt2
+	jsr	EmbObt
+
+	ldaa	#ROJO
 	staa	1,x
 
 	puly
@@ -731,13 +791,13 @@ play1	jsr	EmbObt
 	pula
 
 	rts
-
 *****************************************************************************************
 *				SUBRUTINA DE PLAYER OBTAIN				*
 * Esta subrutina analiza que jugador es el que estÃƒÂ¡ ahora, devolviendo por AccIX el 	*
 * inicio de la matriz para visualizar del contrario					*
 *****************************************************************************************
 PlObt	equ	*
+
 	psha
 	pshb
 	pshy
@@ -771,9 +831,15 @@ PlObt2	equ	*
 	cmpa	#P1
 	bne	plai2
 	ldx	#EMBARP2
-	bra	play1
+	bra	plai1
 
 plai2	ldx	#EMBARP1
+
+plai1	puly
+	pulb
+	pula
+
+	rts
 		
 *****************************************************************************************
 *				SUBRUTINA OBTENER CELDA					*
@@ -822,7 +888,6 @@ nofound	cmpa	0,x
 	beq	found
 
 	inx
-	inx
 	bra	nofound
 	
 found	puly
@@ -832,88 +897,165 @@ found	puly
 	rts
 
 *****************************************************************************************
-*				SUBRUTINA CARGUERO DAÃƒÂ‘ADO				*
-* Esta subrutina se encarga de pintar de rojo la parte del carguero no seleccionada	*
-* que  ya fue disparada, una vez que se le dispara a su otra parte.			*
+*				SUBRUTINA DE GANADOR					*
+* Esta subrutina se encarga de verificar que el jugador que recien disparó, haya ganado	*
+* o no.											*
 *****************************************************************************************
-CarDan	equ	*
-	
-	pshy
-	pshx
+win	equ	*
+
 	psha
 	pshb
-
-	ldy	#RAM
-	ldaa	#P1			;verifico que jugador es
-	cmpa	0,y
-	bne	Jugad2	
-
-	ldx	#EMBARP2		;es el jugador 1 quien juega
-	bra	compar
-				
-Jugad2	ldx	#EMBARP1		;es el jugador 2 quien juega
+	pshy
+	pshx
 	
-compar	ldab	#6
-	abx				;apunta a los cargueros
-
-	ldaa	1,y
-	lsla
-	lsla	
-	lsla	
-	lsla
-	ldab	2,y
-	aba				;obtengo fila y columna de celda disparada
+	jsr	PlObt2
 	
-	cmpa	0,x
-	bne	gotod
-	ldaa	#ROJO			;encontramos la parte sin daÃƒÂ±ar en el primero
-	staa	2,x			;Cargo en la matriz para ganar que esta hundido
-			
-	
-	ldaa	#P1					
-	cmpa	0,y
-	bne	jug2
-
-	ldx	#MATP2			;Verifico de nuevo que jugador es
-	bra	goto4
-
-jug2	ldx	#MATP1
-
-goto4	jsr	CelObt
 	ldaa	#ROJO
-	ldab	0,x
-	andb	#11000000b
-	aba
-	staa	0,x			;pinto de rojo la celda disparada, ahora falta la celda que se disparo previamente
+	ldab	#3			;defino un contador para la cantidad de submarinos
 
+salto1	cmpa	1,x		
+	bne	nowin			;Saltará si encontro un submarino no hundido
 	
-* VER QUE MIERDA QUIEREN PONER ACA CON ESE LDX SIN "VALOR"
-	
-	
-* ldx				
-	bra	si
+	inx
+	inx				;dejo el puntero en el siguiente submarino
+	decb
+	beq	noSubm			;en caso de que el contador sea 0, significa que no queda submarino en pie
+	bra	salto1
 
-gotod	cmpa	1,x
-	bne	not	
-	ldaa	#ROJO			;encontramos la parte sin daÃƒÂ±ar en el segundo
-	staa	2,x			;Cargo en la matriz para ganar que esta hundido
+noSubm	ldab	#2
+salto2	cmpa	2,x
+	bne	nowin			;Saltará si encontro un carguero no hundido
 
-
-	bra	si
-
-not	inx				;no encontramos el carguero
+	inx
 	inx
 	inx
 
-	bra	compar
-si
-	pulb
-	pula
+	decb
+	beq	winner			;Encontró el ganador ya que se analizaron los 2 cargueros
+	bra	salto2
+
+	jsr	windsp
+winner	jsr	Rstwait
+	jsr	clear
+
+	sec				;en caso de que se obtuvo algun ganador pongo el carry en 1 para indicar al programa que ya no se debe ejecutar mas y preparo al juego para iniciarlo nuevamente
+
+nowin	clc				;pone el carry en cero si no hubo algun ganador
 	pulx
 	puly
+	pulb
+	pula
+	
+	rts
+*****************************************************************************************		
+*				SUBRUTINA RESET WAIT					*
+* Una vez que se haya encontrado el ganador, esperara a que se toque la tecla de reset	*
+* para empezar a jugar de nuevo								*
+*****************************************************************************************
+Rstwait	equ	*
+
+	psha
+	pshb
+	pshx
+	pshy
+
+non	jsr	TEC
+	jsr	DELAY
+	jsr	DESTEC
+
+	bcc	non
+
+	jsr	MATRIZ1
+	jsr	MATRIZ2				;de esta matriz biene el valor de la tecla precionada en el Registro A
+
+
+
+	ldab	#$CC
+	cba
+	bne	non
+	
+	puly
+	pulx
+	pulb
+	pula
 
 	rts
+*****************************************************************************************
+*				SUBRUTINA WINNER DISPLAY				*
+* Esta subrutina hace pasar por display un cartel felicitando al ganador		*
+*****************************************************************************************
+windsp	equ	*
+	psha
+	pshb
+	pshy
+	pshx
 
+	jsr 	clear
+	
+	ldy	#RAM
+	ldaa	#P1
+	cmpa	0,y
+	bne	P1WINNT				;verifico que jugador es el que ganó
+
+	ldx	#P1WIN				;cargo el registro X con la posicion del comienzo del string
+	bra	prntwin
+
+P1WINNT	ldx	#P2WIN				;cargo el registro X con la posicion del comienzo del string
+
+prntwin	equ	*
+
+	ldy	#10				;creo un contador de 10 unidades en el registro Y. La finalidad de este contador es utlizarlo para conocer cuando el programa dejara de imprimir caracteres en el display
+	
+	
+	clr	0,x				;se limpia la posicion la cual esta posicionada el registro X. Este cero estara ubicado a para indicar el comienzo o final de la palabra
+
+	dex					;se drcrementa el registro X para que nuestro puntero quede posicionado 3 lugares por detras
+	clr	0,x				;de la primera letra a mostrar en el diplay
+
+	dex
+	clr	0,x				;a su vez cada vez que se decrementa el valor del reg. X se va limpiando las respectivas posiciones, para evitar que se impriman caracteres que no fomran parte de la palabra
+
+	dex
+	clr	0,x
+
+	jsr	clear				;salto a la subrutinia clear la cual se encarga de limpiar los caracteres que se encuentren en el display
+
+
+REP3	ldaa	0,x				;cargo en el registro A el caracter que inidca el puntero X
+	ldab	#3				;cargo en la posicion 3 del display el caracter obtenido del registro A
+	jsr	outchar				;imprimo el caracter en el display
+
+	ldaa	1,x				;cargo en el registro A el caracter siguinte al que fue impreso
+	ldab	#2				;cargo en la posicion 2 del display el caracter consecutivo al impreso
+	jsr	outchar				;imprimo el caracter en el display
+
+
+	ldaa	2,x				;cargo el siguiente caracter en el registro A
+	ldab	#1				;cargo en la posicion 1 del display el caracter que fue obtenido
+	jsr	outchar				;imprimo el caracter en el display
+
+
+	ldaa	3,x				;cargo en el registro A el ultimo caracter a imprimir antes incrementar el registro X e imprimir en el display nuevos caracteres
+
+	bne	REP4				;analizo si es cero el ultimo caracter a imprimir. La finalidad de este dato es comprobar si  el puntero X esta llegando a su fin e ir decrementando el contador para que no imprima caracteres de mas)
+	dey					;decremento el contador IY, ya que el caracter cargado en el registro A fue un cero
+	beq	REP5				;en caso de que el contador sea cero quiere decir que el display ya imprimo todos los caracteres de la palabra en el display y este llega a su fin
+
+REP4	ldab	#0				;en caso de que el caracter no haya sido cero o el contador no finalizo, se imprime el caracter del registro A en la posicion cero del display
+
+	jsr	outchar				;se imprimer el caracter en el display
+	jsr	DELAY				;se hace un delay 
+	inx					;se incrementa el registro X para que el programa imprima en el display nuevos caracteres
+	bra	REP3				;se hace un salto para cargar en el display nuevos caracteres
+	
+REP5	equ	*
+
+	pulx
+	puly
+	pulb
+	pula
+
+	rts
 *****************************************************************************************
 *				SUBRUTINA COLOR
 * Esta subrutina se encarga de preparar al bitmap y las matrices de los jugadores para su juego
@@ -1476,7 +1618,7 @@ ESTADOD	org	$4300
 	bne	player2
 	
 	ldx	#SUB1P2
-	ldy	#12
+	ldy	#11
 
 	
 
@@ -1495,7 +1637,7 @@ GOTO3	ldab	0,x				;cargo el registro B con las diferentes posiciones de las emba
 
 player2	equ	*	
 	ldx	#SUB1P1
-	ldy	#12
+	ldy	#11
 
 GOTO5	ldab	0,x				;cargo el registro B con las diferentes posiciones de las embarcaciones 
 	cba
@@ -1514,23 +1656,54 @@ GOTO5	ldab	0,x				;cargo el registro B con las diferentes posiciones de las emba
 AGUA1	equ	*				;en caso de que sea agua mostrara en display la palabra "AGUA"
 
 	jsr	clear
+
+	ldx	#AGUASTR			;cargo el registro X con la posicion del comienzo del string
+	ldy	#10				;creo un contador de 10 unidades en el registro Y. La finalidad de este contador es utlizarlo para conocer cuando el programa dejara de imprimir caracteres en el display
 	
-	ldaa	'A'
-	ldab	#3
-	jsr	outchar
-
-	ldaa	'G'
-	ldab	#2
-	jsr	outchar
-
-	ldaa	'U'
-	ldab	#1
-	jsr	outchar
-
-	ldaa	'A'
-	ldab	#0
-	jsr	outchar
 	
+	clr	0,x				;se limpia la posicion la cual esta posicionada el registro X. Este cero estara ubicado a para indicar el comienzo o final de la palabra
+
+	dex					;se drcrementa el registro X para que nuestro puntero quede posicionado 3 lugares por detras
+	clr	0,x				;de la primera letra a mostrar en el diplay
+
+	dex
+	clr	0,x				;a su vez cada vez que se decrementa el valor del reg. X se va limpiando las respectivas posiciones, para evitar que se impriman caracteres que no fomran parte de la palabra
+
+	dex
+	clr	0,x
+
+	jsr	clear				;salto a la subrutinia clear la cual se encarga de limpiar los caracteres que se encuentren en el display
+
+
+GOTOD	ldaa	0,x				;cargo en el registro A el caracter que inidca el puntero X
+	ldab	#3				;cargo en la posicion 3 del display el caracter obtenido del registro A
+	jsr	outchar				;imprimo el caracter en el display
+
+	ldaa	1,x				;cargo en el registro A el caracter siguinte al que fue impreso
+	ldab	#2				;cargo en la posicion 2 del display el caracter consecutivo al impreso
+	jsr	outchar				;imprimo el caracter en el display
+
+
+	ldaa	2,x				;cargo el siguiente caracter en el registro A
+	ldab	#1				;cargo en la posicion 1 del display el caracter que fue obtenido
+	jsr	outchar				;imprimo el caracter en el display
+
+
+	ldaa	3,x				;cargo en el registro A el ultimo caracter a imprimir antes incrementar el registro X e imprimir en el display nuevos caracteres
+
+	bne	GOTOE				;analizo si es cero el ultimo caracter a imprimir. La finalidad de este dato es comprobar si  el puntero X esta llegando a su fin e ir decrementando el contador para que no imprima caracteres de mas)
+	dey					;decremento el contador IY, ya que el caracter cargado en el registro A fue un cero
+	beq	GOTOF				;en caso de que el contador sea cero quiere decir que el display ya imprimo todos los caracteres de la palabra en el display y este llega a su fin
+
+GOTOE	ldab	#0				;en caso de que el caracter no haya sido cero o el contador no finalizo, se imprime el caracter del registro A en la posicion cero del display
+
+	jsr	outchar				;se imprimer el caracter en el display
+	jsr	DELAY				;se hace un delay 
+	inx					;se incrementa el registro X para que el programa imprima en el display nuevos caracteres
+	bra	GOTOD				;se hace un salto para cargar en el display nuevos caracteres
+
+GOTOF	equ	*	
+
 	jmp	GOTO9
 
 
@@ -1594,6 +1767,8 @@ GOTO7	ldab	#0				;en caso de que el caracter no haya sido cero o el contador no 
 	bra	GOTO6				;se hace un salto para cargar en el display nuevos caracteres
 
 GOTO8	equ	*	
+
+
 	bra	GOTO9
 
 
@@ -1605,7 +1780,7 @@ TOUCH	equ	*
 
 	jsr	clear
 
-	ldx	#TOCADO			;cargo el registro X con la posicion del comienzo del string
+	ldx	#TOCADO				;cargo el registro X con la posicion del comienzo del string
 	ldy	#10				;creo un contador de 10 unidades en el registro Y. La finalidad de este contador es utlizarlo para conocer cuando el programa dejara de imprimir caracteres en el display
 	
 	
@@ -1665,6 +1840,32 @@ GOTO9	equ	*
 	pulb
 	pula
 
+	rts
+
+*****************************************************************************************
+*		SUBRUTINA LLENO
+* Esta subrutina se encarga de colocar en los estados de las embarcaciones algun valor
+* diferente a cero, ya que si el estado esta en cero trae problemas cuando se dispara
+* sobre la fila 0 y columna 0
+*****************************************************************************************
+lleno	equ	*
+
+	pshx
+	psha
+	pshb
+
+	ldx	#EMBARP1
+	ldaa	#$FF			;valor diferente a cero a poner en los estados
+	ldab	#$20			;contador de lugares a poner el valor diferente a cero
+	
+REP1	staa	0,x
+	inx
+	decb
+	bne	REP1			;branch if not = zero
+
+	pulb
+	pula
+	pulx
 	rts
 
 *****************************************************************************************
@@ -2144,7 +2345,7 @@ initdis	equ	*
 *****************************************************************************************
 *				SUBRUTINA OUTCHAR					*
 * Esta subrutina se encarga de mandar al display un caracter y su respectiva posicion	*
-* dentro del display. ACCB: PosiciÃƒÂ³n (0-3)						*
+* dentro del display. ACCB: Posicion (0-3)						*
 *****************************************************************************************
 
 outchar	equ	*

@@ -692,12 +692,13 @@ aguant	tba
 	anda	#AGUA
 	cmpa	#SUBMARI
 	bne	submant
-	ldaa	#ROJO
 	
+	jsr	tst			;En caso de que en la fila y columna disparada se encuentre un submarino se colocara en el bitmap el color rojo y se cargara su respectivo estado en la matriz
+* Ahora manda al bitmap el color rojo
 
+	ldaa	#ROJO
 	bra	pintar
 
-* REVISAR ACA QUE NO TOMA CUANDO
 submant	tba
 	anda	#AGUA
 	cmpa	#DANADO
@@ -706,11 +707,34 @@ submant	tba
 	jsr	CarDan
 
 
-danont
+danont	equ	*			;si no esta dañado y tampoco es un submarino o agua, entonces es un carguero (y por ende habria que dañarlo y poner el color amarillo)
+
+	ldaa	#DANADO
+	ldab	#AMARIL
+	aba
+	staa	0,x			;cargo en la matriz del jugador el estado del barco
+
+* Ahora almaceno el estado en una matriz de las embarcaciones de cada jugador
+	jsr	PlObt2			;esta subrutina me devuelve en IX un puntero posicionado en el comienzo de la matriz de las embaraciones de cada jugador
+	jsr	EmbObt			;esta subrutina me posiciona el puntero IX la posicion de la celda disparada
+
+
+volve	ldaa	1,x
+	beq	incre
+
+	inx
+	bra	volve
+
+incre	stab	1,x			;cargo en la matriz de la embarcaciones el estado del carguero
+	bra	toca
+
 
 pintar	andb	#11000000b		;Limpio el color previo de la casilla
 	aba				;le sumo el color correcto para que se mantenga el tipode embarcacion y su color
 	staa	0,x			;se guarda en la matriz del jugador el nuevo estado para visualizarse en display
+
+
+
 
 	ldy	#RAM
 	ldaa	0,y
@@ -725,19 +749,43 @@ play1	jsr	EmbObt
 
 	staa	1,x
 
-	puly
+toca	puly
 	pulx
 	pulb
 	pula
 
 	rts
 
+*********************************************************
+*		SUBRUTINA TEST
+* Para corregir las cagadas :)
+*********************************************************
+tst	equ	*
+
+	psha
+	pshb
+	pshx
+	pshy
+
+	jsr	PlObt2
+	jsr	EmbObt
+
+	ldaa	#ROJO
+	staa	1,x
+
+	puly
+	pulx
+	pulb
+	pula
+
+	rts
 *****************************************************************************************
 *				SUBRUTINA DE PLAYER OBTAIN				*
 * Esta subrutina analiza que jugador es el que estÃƒÂ¡ ahora, devolviendo por AccIX el 	*
 * inicio de la matriz para visualizar del contrario					*
 *****************************************************************************************
 PlObt	equ	*
+
 	psha
 	pshb
 	pshy
@@ -771,9 +819,15 @@ PlObt2	equ	*
 	cmpa	#P1
 	bne	plai2
 	ldx	#EMBARP2
-	bra	play1
+	bra	plai1
 
 plai2	ldx	#EMBARP1
+
+plai1	puly
+	pulb
+	pula
+
+	rts
 		
 *****************************************************************************************
 *				SUBRUTINA OBTENER CELDA					*
@@ -821,7 +875,6 @@ EmbObt	equ	*
 nofound	cmpa	0,x
 	beq	found
 
-	inx
 	inx
 	bra	nofound
 	
