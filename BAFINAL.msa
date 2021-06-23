@@ -71,11 +71,14 @@ Compa	equ	$30F0
 *****************************************************************
 *			STRING DE PALABRAS			*
 *****************************************************************
-HUNDIDO	equ	$3E00
-TOCADO	equ	$3E50
-AGUASTR	equ	$3D80
 P1WIN	equ	$3D00
 P2WIN	equ	$3D40
+AGUASTR	equ	$3D80
+HUNDIDO	equ	$3E00
+TOCADO	equ	$3E50
+P1OP2	equ	$3EA0
+TROF1	equ	$3ED0
+TROF2	equ	$3F30
 
 	org	HUNDIDO
 	fcb	' '			;cargo un espacio al comienzo del string el cual sirve para conocer el inicio y fin de la palabra
@@ -97,15 +100,27 @@ ENDSTR3	equ	*			;tomo la posicion de memoria posterior al string para usarla com
 
 	org	P1WIN
 	fcb	' '
-	fcc	'GANO EL JUGADOR 1'	;Guardo un string con la palabra ganadora del jugador 1
+	fcc	'GANADOR P1'	;Guardo un string con la palabra ganadora del jugador 1
 ENDSTR4	equ	*
 	fcb	' ',0,0,0
 
 	org	P2WIN
 	fcb	' '
-	fcc	'GANO EL JUGADOR 2'	;guardo un strng con la palabra ganadora del jugador 2
+	fcc	'GANADOR P2'	;guardo un strng con la palabra ganadora del jugador 2
 ENDSTR5	equ	*
 	fcb	' ',0,0,0
+
+	org	P1OP2
+	fcb	' '
+	fcc	'INSERT PLAYER'	;guardo un string que aparecera cuando hubo algun error con la seleccion de los jugadores
+ENDSTR6	equ	*
+	fcb	' ',0,0,0
+
+	org	TROF1			;se crea una secuencia de caracteres que imprime un "trofeo de 1" en pantalla
+	fcb	$15,$15,$3d,$3d,$15,$15,$15,$3d,$3d,$3d,$15,$15,$15,$15,$3d,$3d,$15,$15,$15,$15,$3d,$3d,$15,$15,$15,$15,$3d,$3d,$15,$15,$15,$24,$24,$24,$24,$15
+
+	org	TROF2
+	fcb	$15,$15,$3d,$3d,$15,$15,$15,$3d,$15,$15,$3d,$15,$15,$15,$15,$15,$3d,$15,$15,$15,$15,$3d,$15,$15,$15,$15,$3d,$15,$15,$15,$15,$24,$24,$24,$24,$15
 
 *****************************************************************
 *			SUBRUTINA TEC Y DESTEC			*
@@ -243,6 +258,7 @@ L5	clr	0,x
 	jsr	DESTEC
 
 	bcc	GOTO			;analiza si el carry esta en 1, ya que en caso de que este quiere decir que hubo un pulso de una tecla
+
 	jsr	MATRIZ1
 	jsr	MATRIZ2
 
@@ -265,54 +281,108 @@ main	equ	*
 	%CLEAN4	RAM,5
 
 	jsr	initdis			;inicializa display y teclado
-
-
 	jsr	lleno			;sirve para cargar en los estados de los barcos un valor diferente a cero (SOLO SE EJECUTA UNA UNICA VEZ AL COMIENZO DEL PROGRAMA)
 	jsr	EMBAR			;carga en una matriz las posiciones de las embarcaciones de ambos jugadores que luego a medida que transcurra el juego se iran cargando con su estado de (Hundido o Tocado)
 	jsr	EMBP1			;carga en matriz de memoria las embarcaciones del jugador 1
 	jsr	EMBP2			;carga en matriz de memoria las embarcaciones del jugador 2
 	jsr	COLOR
-REP6	jsr	clear			;antes de empezar la jugada limpia el display
-
+REP7	jsr	clear			;antes de empezar la jugada limpia el display
 
 GOTO	equ	*
 	ldy	#RAM
+
 	%TECLA				;la primera tecla contiene informacion del turno (si es P1 o P2)
+	cmpa	#$CC			;analizo si la tecla precionada es la de RESET
+OUTRANG	beq	main			;en caso de precionarse la tecla de RESET el juego se reiniciara
+
+	jsr	PLAYER			;analiza que quien es el turno y muestra en display el jugador actual (PLAYER 1 CARRY=1   y  PLAYER 2 CARRY=0)
+	jsr	TRANSFE
+	jsr	sub_err
+
+	bcc	sigue2			;branch if carry clear (C=0)
+
+	jsr	DELAY
+	jsr	clear
+	jsr	INSP1P2
+	jmp	GOTO
+
+sigue2	%TECLA				;se preciona la tecla de la fila a disparar
+
+	cmpa	#$CC			;analizo si la tecla precionada es la de RESET
+	beq	OUTRANG			;en caso de precionarse la tecla de RESET el juego se reiniciara
+
+	cmpa	#P1			;en caso de que un jugador ya tenga su turno analizo si la siguiente tecla precionada es un numero o una nueva eleccion del jugador
+	beq	cambio
+
+	cmpa	#P2
+	beq	cambio
+	jmp	sigue
+
+cambio	dey
+	ldaa	0,y
+	dey
+	staa	0,y
+	iny
+
 	jsr	PLAYER			;analiza que quien es el turno y muestra en display el jugador actual (PLAYER 1 CARRY=1   y  PLAYER 2 CARRY=0)
 	jsr	TRANSFE
 
+	jmp	sigue2
 
-
-	%TECLA				;se preciona la tecla de la fila a disparar
-	jsr	clear			;limpio el display
+sigue	jsr	clear			;limpio el display
 	jsr	PRINFIL			;imprimo en el display la fila precionada
 
 	%TECLA				;se preciona la tecla de la columna a disparar
+	cmpa	#$CC			;analizo si la tecla precionada es la de RESET
+	beq	REP2			;en caso de precionarse la tecla de RESET el juego se reiniciara
+
 	jsr	clear			;limpio el display
 	jsr	PRINCOL			;imprimo en el display la columna precionada
+*****************************************************************
+*		TECLA DE DISPARO				*
+* Aca llamo a la macro de tecla pero manualmente ya que 	*
+* por diferentes errores el compilador tira "out of range"	*
+* si se utiliza la macro de TECLA				*
+*****************************************************************
+	jsr	TEC
+	jsr	DELAY
+	jsr	DESTEC
 
-	%TECLA				;se preciona la tecla de disparo
+	bcc	salto3
+	bra	sigue3
 
+salto3	jmp	GOTO
+
+sigue3	jsr	MATRIZ1
+	jsr	MATRIZ2
+
+	staa	0,y
+	cmpa	#$CC			;analizo si la tecla precionada es la de RESET
+	beq	REP2			;en caso de precionarse la tecla de RESET el juego se reiniciara
+
+	iny
+	
 	jsr	corrob
 	bcs	REP6
 	
-	jsr	pint
+	jmp	sigue1
+REP6	jmp	REP7
+	
+sigue1	jsr	pint
 	jsr	TRANSFE
 	jsr	ESTADOD			;muestra en display si en la tecla disparada 
 
-	
 	jsr	win	
 	bcs	REP2			;si luego de la subrutina Win el carry esta en 1 quiere decir que hubo algun ganador y se debe de preparar al programa para un nuevo juego. De caso contrario se sigue la partida
 	
 	%CLEAN5	RAM,5			;luego se limpia estas posiciones de memoria en donde se almacena el jugador, fila, columna y disparo para que en estas posiciones se alamcene esta informacion pero del otro jugador
+	jsr	INSP1P2
 	jmp	GOTO
 
 REP2	jmp	main
-
 *****************************************************************************************
 *			SUBRUTINA CORROBORAR						*
-* Esta subrutina corrobora si la tecla presionada, ya fue presionada y por ende evita 	*
-* que se precione dos veces la misma tecla						*
+* Esta subrutina corrobora si la tecla presionada, ya fue presionada			*
 *****************************************************************************************
 corrob	equ	*
 	pshx
@@ -1022,9 +1092,14 @@ windsp	equ	*
 	bne	P1WINNT				;verifico que jugador es el que ganó
 
 	ldx	#P1WIN				;cargo el registro X con la posicion del comienzo del string
+
+	jsr	TROFEO1				;si gano jugador 1 imprime un 1 en el BITMAP
+
 	bra	prntwin
 
 P1WINNT	ldx	#P2WIN				;cargo el registro X con la posicion del comienzo del string
+
+	jsr	TROFEO2				;si gano jugador 2 imprime un 2 en el BITMAP
 
 prntwin	equ	*
 
@@ -1081,6 +1156,68 @@ REP5	equ	*
 
 	rts
 
+*****************************************************************************************
+*			SUBRUTINA INSP1P2
+* Esta subrutina se encarga de mostrar en display "Insert Player Again" en caso de que
+* no se haya seleccionado algun jugador antes de precionar la fila y columna
+*****************************************************************************************
+INSP1P2	equ	*				;en caso de que sea agua mostrara en display la palabra "Insert Player Again"
+
+	pshx
+	psha
+	pshb
+
+	ldx	#P1OP2			;cargo el registro X con la posicion del comienzo del string
+	ldy	#10				;creo un contador de 10 unidades en el registro Y. La finalidad de este contador es utlizarlo para conocer cuando el programa dejara de imprimir caracteres en el display
+	
+	
+	clr	0,x				;se limpia la posicion la cual esta posicionada el registro X. Este cero estara ubicado a para indicar el comienzo o final de la palabra
+
+	dex					;se drcrementa el registro X para que nuestro puntero quede posicionado 3 lugares por detras
+	clr	0,x				;de la primera letra a mostrar en el diplay
+
+	dex
+	clr	0,x				;a su vez cada vez que se decrementa el valor del reg. X se va limpiando las respectivas posiciones, para evitar que se impriman caracteres que no fomran parte de la palabra
+
+	dex
+	clr	0,x
+
+	jsr	clear				;salto a la subrutinia clear la cual se encarga de limpiar los caracteres que se encuentren en el display
+
+
+REP8	ldaa	0,x				;cargo en el registro A el caracter que inidca el puntero X
+	ldab	#3				;cargo en la posicion 3 del display el caracter obtenido del registro A
+	jsr	outchar				;imprimo el caracter en el display
+
+	ldaa	1,x				;cargo en el registro A el caracter siguinte al que fue impreso
+	ldab	#2				;cargo en la posicion 2 del display el caracter consecutivo al impreso
+	jsr	outchar				;imprimo el caracter en el display
+
+
+	ldaa	2,x				;cargo el siguiente caracter en el registro A
+	ldab	#1				;cargo en la posicion 1 del display el caracter que fue obtenido
+	jsr	outchar				;imprimo el caracter en el display
+
+
+	ldaa	3,x				;cargo en el registro A el ultimo caracter a imprimir antes incrementar el registro X e imprimir en el display nuevos caracteres
+
+	bne	REP9				;analizo si es cero el ultimo caracter a imprimir. La finalidad de este dato es comprobar si  el puntero X esta llegando a su fin e ir decrementando el contador para que no imprima caracteres de mas)
+	dey					;decremento el contador IY, ya que el caracter cargado en el registro A fue un cero
+	beq	REPA				;en caso de que el contador sea cero quiere decir que el display ya imprimo todos los caracteres de la palabra en el display y este llega a su fin
+
+REP9	ldab	#0				;en caso de que el caracter no haya sido cero o el contador no finalizo, se imprime el caracter del registro A en la posicion cero del display
+
+	jsr	outchar				;se imprimer el caracter en el display
+	jsr	DELAY				;se hace un delay 
+	inx					;se incrementa el registro X para que el programa imprima en el display nuevos caracteres
+	bra	REP8				;se hace un salto para cargar en el display nuevos caracteres
+
+REPA	equ	*	
+	pulb
+	pula
+	pulx
+
+	rts
 *****************************************************************************************
 *				SUBRUTINA HUNDIR					*
 * Esta subrutina se encarga de hundir el carguero al que le hayan disparado, si esta	*
@@ -1699,6 +1836,73 @@ L0C	equ	*
 	rts
 
 
+*****************************************************************************************
+*				SUBRUTINA ERROR					        *                             	
+* analizará que las cuatro teclas que se usan para jugar, cumplan cada una el rango de   *
+* opciones pautado									*
+*                                        			      			*
+*****************************************************************************************
+ 
+sub_err equ     *
+
+	pshb	
+	psha
+	pshx
+
+
+* analisis de primera tecla (pi/p2)
+
+	ldaa	RAM				;cargo en A la primera tecla
+	cmpa	#P1				;la comparo con el boton P1
+	bne	sigue5				;si no coincide analizo si es p2
+	bra	sigue4
+
+sigue5	cmpa	#P2				;la comparo con el boton p2
+	bne	ERROR				;si no coincide es un error
+	
+sigue4	clc					;limpio el carry
+	bra	FIN1				;si no ocurre ningun error retorna al main
+	
+
+
+*********************************************************
+*		EN CASO DE HABER ERROR			*
+* 	Envia al display la palabra "ERRO"		*					
+*********************************************************
+
+ERROR   equ	*
+
+	ldaa	#'E'				;cargo en A la primera letra 
+	ldab	#3				;cargo en la letra en la primera posicion del display
+	jsr	outchar				;envio la letra al display
+		
+	ldaa	#'R'				;cargo en A la segunda letra 
+	ldab	#2				;cargo en la letra en la segunda posicion del display
+	jsr	outchar				;envio la letra al display
+
+	ldaa	#'R'				;cargo en A la tercera letra 
+	ldab	#1				;cargo en la letra en la tercera posicion del display
+	jsr	outchar				;envio la letra al display
+
+	ldaa	#'O'				;cargo en A la cuarta letra 
+	ldab	#0				;cargo en la letra en la cuarta posicion del display
+	jsr	outchar				;envio la letra al display
+	
+	sec					;en caso de error devuelve el carry en 1		
+
+*************************************************************
+*		EN CASO DE NO HABER ERROR	  	    *
+* 	Retorna al programa principal			    *		
+*************************************************************
+
+
+FIN1	equ	*
+
+        pulx
+        pula
+        pulb
+
+        rts
 
 *****************************************************************************************
 *			SUBRUTINA ESTADO (DISPLAY)					*
@@ -2462,7 +2666,7 @@ DELAY	equ	*
 	pshx				Hago backup de los registros
 	pshy				X y Y
 
-	ldy	#14			Cargo el valor de repeticiones del Loop "Mayor"	
+	ldy	#10			Cargo el valor de repeticiones del Loop "Mayor"	
 GOTO2	ldx	#62497			Cargo el valor de repeticiones del loop "Interno"	
 
 GOTO1	dex				Decremento el contador
@@ -2505,6 +2709,70 @@ clear	equ	*
 	pula
 	
 	rts	
+
+
+
+*****************************************************************************************
+*				SUBRUTINA GANADOR P1					*
+* Esta subrutina se encarga de colocar la imagen de un "TROFEO" en el bitmap una vez de	*
+* que hubo algun ganado									*
+*****************************************************************************************
+TROFEO1	equ	*
+
+	pshx
+	pshy
+	psha
+	pshb
+
+	ldx	#TROF1
+	ldy	#BITMAP
+	ldab	#36
+
+sigue6	ldaa	0,x
+	staa	0,y
+
+	inx
+	iny
+	decb
+	bne	sigue6			;branch if not = zero
+
+	pulb
+	pula
+	puly
+	pulx
+
+	rts
+
+*****************************************************************************************
+*				SUBRUTINA GANADOR P2					*
+* Esta subrutina se encarga de colocar la imagen de un "TROFEO" en el bitmap una vez de	*
+* que hubo algun ganado									*
+*****************************************************************************************
+TROFEO2	equ	*
+
+	pshx
+	pshy
+	psha
+	pshb
+
+	ldx	#TROF2
+	ldy	#BITMAP
+	ldab	#36
+
+sigue7	ldaa	0,x
+	staa	0,y
+
+	inx
+	iny
+	decb
+	bne	sigue7			;branch if not = zero
+
+	pulb
+	pula
+	puly
+	pulx
+
+	rts
 *****************************************************************************************
 *				RESERVA DE MEMORIA					*
 * En este partado se reservan las diferentes zonas que se concideran escenciales	*
