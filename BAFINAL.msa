@@ -311,7 +311,8 @@ REP2	jmp	main
 
 *****************************************************************************************
 *			SUBRUTINA CORROBORAR						*
-* Esta subrutina corrobora si la tecla presionada, ya fue presionada			*
+* Esta subrutina corrobora si la tecla presionada, ya fue presionada y por ende evita 	*
+* que se precione dos veces la misma tecla						*
 *****************************************************************************************
 corrob	equ	*
 	pshx
@@ -1698,87 +1699,6 @@ L0C	equ	*
 	rts
 
 
-*****************************************************************************************
-*				SUBRUTINA ERROR					        *                             	
-*analizará que las cuatro teclas que se usan para jugar, cumplan cada una el rango de   *
-* opciones pautado									*
-*                                        			      			*
-*****************************************************************************************
- 
-sub_err equ     *
-
-		pshb	
-		psha
-		pshx
-
-
-;analisis de primera tecla (pi/p2)
-
-	ldaa	$30A0				;cargo en A la primera tecla
-	cmpa	#$AA				;la comparo con el boton P1
-	bne	ERROR				;si no coincide es un error
-	cmpa	#$BB				;la comparo con el boton p2
-	bne	ERROR				;si no coincide es un error
-	
-
-;analisis segunda tecla (fil)
-	ldaa	$30A1				;cargo en A la segunda tecla ingresada
-	bls	5				;si es menor salto a analizar tercera tecla
-	
-
-
-
-
-
-;analisis tercera tecla (col)
-h2	ldaa	$30A2				;cargo en A la tercera tecla ingresada
-						;
-
-
-
-;analisis cuarta tecla (fire)
-	ldaa	$30A3				;cargo en A la cuarta tecla ingresada
-	cmpa	#$FF				;comparo si es igual a la tecla "FIRE"
-	bne	ERROR				; SI NO LO ES, ES UN ERROR.
-
-*********************************************************
-*		EN CASO DE HABER ERROR			*
-* 	Envia al display la palabra "ERRO"		*					
-*********************************************************
-
-ERROR   equ	*
-
-	ldaa	#'E'				;cargo en A la primera letra 
-	ldab	#3				;cargo en la letra en la primera posicion del display
-	jsr	outchar				;envio la letra al display
-		
-	ldaa	#'R'				;cargo en A la segunda letra 
-	ldab	#2				;cargo en la letra en la segunda posicion del display
-	jsr	outchar				;envio la letra al display
-
-	ldaa	#'R'				;cargo en A la tercera letra 
-	ldab	#1				;cargo en la letra en la tercera posicion del display
-	jsr	outchar				;envio la letra al display
-
-	ldaa	#'O'				;cargo en A la cuarta letra 
-	ldab	#0				;cargo en la letra en la cuarta posicion del display
-	jsr	outchar				;envio la letra al display
-	
-	sec					;en caso de error devuelve el carry en 1		
-
-*************************************************************
-*		EN CASO DE NO HABER ERROR	  	    *
-* 	Retorna al programa principal			    *		
-*************************************************************
-
-
-FIN	equ	*
-
-        pulx
-        pula
-        pulb
-
-        rts
 
 *****************************************************************************************
 *			SUBRUTINA ESTADO (DISPLAY)					*
@@ -2542,7 +2462,7 @@ DELAY	equ	*
 	pshx				Hago backup de los registros
 	pshy				X y Y
 
-	ldy	#10			Cargo el valor de repeticiones del Loop "Mayor"	
+	ldy	#14			Cargo el valor de repeticiones del Loop "Mayor"	
 GOTO2	ldx	#62497			Cargo el valor de repeticiones del loop "Interno"	
 
 GOTO1	dex				Decremento el contador
